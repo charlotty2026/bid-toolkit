@@ -1,0 +1,9 @@
+{
+  "project_name": "XX单位后勤服务外包项目",
+  "project_id": "XX-2026-FW001",
+  "purchaser": "XX单位",
+  "budget": 500000,
+  "fund_source": "财政资金",
+  "_说明": "复制此文件修改项目信息后，用 python rfp_generator.py --config your_config.json -o output/招标文件.md 生成",
+  "_type": "services"
+}
