@@ -1,4 +1,4 @@
-# 📝 bid-toolkit — 标书自动化工具包 v3.0
+# 📝 bid-toolkit — 标书自动化工具包 v3.3
 
 > AI写标书不是新鲜事，但"AI按你的格式规范严格生成文档"才是真正的提效。
 
@@ -333,3 +333,8 @@ bid-toolkit/
 ## License
 
 MIT
+
+## 仓库地址
+
+- GitHub: https://github.com/charlotty2026/bid-toolkit
+- Gitee: https://gitee.com/fenglinhuoshanmen/bid-toolkit
