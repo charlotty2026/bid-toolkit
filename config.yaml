@@ -1,0 +1,77 @@
+# bid-toolkit 格式配置文件
+# 根据招标文件要求修改这里的参数，脚本会自动读取
+
+# ===== 正文格式 =====
+body:
+  font: "宋体"           # 正文字体：宋体 / 仿宋 / 黑体 / 楷体
+  size: 12               # 字号(pt)：12=小四 / 14=四号 / 10.5=五号
+  bold: false
+  first_indent_chars: 2  # 首行缩进字符数（0=不缩进）
+  line_spacing: 1.5      # 行距：1.5=1.5倍行距 / 28=固定28磅 / 1=单倍
+  alignment: "justify"   # 对齐：justify=两端对齐 / left=左对齐 / center=居中
+
+# ===== 标题格式 =====
+headings:
+  h1:
+    font: "宋体"
+    size: 16             # 三号
+    bold: true
+    space_before: 12     # 段前间距(磅)
+    space_after: 6       # 段后间距(磅)
+  h2:
+    font: "宋体"
+    size: 15             # 小三
+    bold: true
+    space_before: 8
+    space_after: 4
+  h3:
+    font: "宋体"
+    size: 14             # 四号
+    bold: true
+    space_before: 6
+    space_after: 3
+  h4:
+    font: "宋体"
+    size: 14
+    bold: true
+    space_before: 4
+    space_after: 2
+
+# ===== 表格格式 =====
+table:
+  font: "宋体"
+  size: 10.5             # 五号
+  bold_header: true
+  style: "Table Grid"    # 表格边框样式
+
+# ===== 页面设置 =====
+page:
+  margin_top: 2.54       # 上边距(cm)
+  margin_bottom: 2.54    # 下边距(cm)
+  margin_left: 2.00      # 左边距(cm)
+  margin_right: 2.00     # 右边距(cm)
+  orientation: "portrait" # portrait=竖向 / landscape=横向
+
+# ===== 暗标模式 =====
+anonymous:
+  enabled: false
+  replace_words:         # 需要替换的关键词
+    - "我公司"
+    - "本公司"
+    - "投标人"
+  replace_with: "投标人" # 替换为
+  company_names: []      # 公司全称/简称，会自动替换
+  company_addresses: []  # 公司地址，会自动替换
+
+# ===== 质检规则 =====
+quality:
+  check_placeholder: true    # 检查占位符（请填写/XXX/TODO）
+  check_punctuation: true    # 检查全角半角
+  check_forbidden_words: true # 检查禁用词
+  forbidden_words:            # 禁用词列表
+    - "保证中标"
+    - "100%成功率"
+    - "最优价格"
+    - "独家技术"
+    - "唯一选择"
+    - "最高质量"
