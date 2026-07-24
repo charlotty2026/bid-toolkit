@@ -1,0 +1,54 @@
+{
+  "forbidden_words": [
+    {
+      "word": "保证中标",
+      "category": "从config导入",
+      "added_by": "system",
+      "added_date": "2026-07-22",
+      "status": "approved",
+      "note": ""
+    },
+    {
+      "word": "100%成功率",
+      "category": "从config导入",
+      "added_by": "system",
+      "added_date": "2026-07-22",
+      "status": "approved",
+      "note": ""
+    },
+    {
+      "word": "最优价格",
+      "category": "从config导入",
+      "added_by": "system",
+      "added_date": "2026-07-22",
+      "status": "approved",
+      "note": ""
+    },
+    {
+      "word": "独家技术",
+      "category": "从config导入",
+      "added_by": "system",
+      "added_date": "2026-07-22",
+      "status": "approved",
+      "note": ""
+    },
+    {
+      "word": "唯一选择",
+      "category": "从config导入",
+      "added_by": "system",
+      "added_date": "2026-07-22",
+      "status": "approved",
+      "note": ""
+    },
+    {
+      "word": "最高质量",
+      "category": "从config导入",
+      "added_by": "system",
+      "added_date": "2026-07-22",
+      "status": "approved",
+      "note": ""
+    }
+  ],
+  "sensitive_words": [],
+  "compliant_words": []
+}

@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.docx
+*.doc
+*.pdf
+*.DS_Store
+*.swp
+*.swo
+*~
+.env
+rfp/samples/real_bids/

@@ -1,0 +1,44 @@
+# 企业投标通用模板
+# 适用：企业间招投标、商业项目、服务类投标
+# 特点：仿宋为主，固定28磅行距，更紧凑
+
+body:
+  font: "仿宋"
+  size: 12
+  bold: false
+  first_indent_chars: 2
+  line_spacing: 28        # 固定28磅行距
+  alignment: "justify"
+
+headings:
+  h1:
+    font: "黑体"
+    size: 16
+    bold: true
+    space_before: 12
+    space_after: 6
+  h2:
+    font: "黑体"
+    size: 15
+    bold: true
+    space_before: 8
+    space_after: 4
+  h3:
+    font: "仿宋"
+    size: 14
+    bold: true
+    space_before: 6
+    space_after: 3
+
+table:
+  font: "仿宋"
+  size: 10.5
+  bold_header: true
+  style: "Table Grid"
+
+page:
+  margin_top: 2.54
+  margin_bottom: 2.54
+  margin_left: 2.50
+  margin_right: 2.50
+  orientation: "portrait"
