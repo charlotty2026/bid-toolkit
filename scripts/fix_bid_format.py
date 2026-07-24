@@ -45,11 +45,11 @@ except ImportError:
     sys.exit(1)
 
 # ─── 路径环境变量 ─────────────────────────────────────────
-ZONGMEN_ROOT = os.environ.get("ZONGMEN_ROOT", "/home/ubuntu/internal")
-UPLOADS_DIR = os.path.join(ZONGMEN_ROOT, "uploads")
-OUTPUTS_DIR = os.path.join(ZONGMEN_ROOT, "outputs")
-LOGS_DIR = os.path.join(ZONGMEN_ROOT, "logs")
-TOOLS_DIR = os.path.join(ZONGMEN_ROOT, "tools")
+WORK_ROOT = os.environ.get("WORK_ROOT", os.path.expanduser("~/bid-workspace"))
+UPLOADS_DIR = os.path.join(WORK_ROOT, "uploads")
+OUTPUTS_DIR = os.path.join(WORK_ROOT, "outputs")
+LOGS_DIR = os.path.join(WORK_ROOT, "logs")
+TOOLS_DIR = os.path.join(WORK_ROOT, "tools")
 
 
 # ============================================================
