@@ -127,6 +127,51 @@ class TestRFPGenerator(unittest.TestCase):
         else:
             self.skipTest("docx生成可能缺少依赖")
 
+    def test_scoring_table_four_columns(self):
+        """测试评分表四列拆分法（评分项/分值/得分条件/材料）"""
+        output_path = os.path.join(self.output_dir, "test_scoring.md")
+        result = subprocess.run(
+            [sys.executable, os.path.join(RFP_DIR, "rfp_generator.py"),
+             "--type", "services", "--project", "评分测试项目",
+             "--budget", "500000", "-o", output_path],
+            capture_output=True, text=True, cwd=RFP_DIR
+        )
+        self.assertEqual(result.returncode, 0, f"生成失败: {result.stderr}")
+        content = open(output_path, encoding="utf-8").read()
+        # 应有四列表头
+        self.assertIn("得分条件", content, "评分表应有'得分条件'列")
+        self.assertIn("投标人需提供的材料", content, "评分表应有'材料'列")
+        # 不应再有旧的占位符
+        self.assertNotIn("【待填写评分细则】", content, "不应再有占位符")
+        # 应有合计行
+        self.assertIn("合计", content)
+
+    def test_scoring_total_100_all_types(self):
+        """测试三种项目类型评分分值合计均为100"""
+        for ptype in ["goods", "services", "engineering"]:
+            sys.path.insert(0, RFP_DIR)
+            from rfp_generator import DETAILED_SCORING
+            total = sum(score for _, score, _, _ in DETAILED_SCORING[ptype])
+            self.assertEqual(total, 100, f"{ptype}评分合计应为100，实际{total}")
+
+    def test_rejection_clauses_categorized(self):
+        """测试废标条款分类（资格/符合/格式三类）"""
+        output_path = os.path.join(self.output_dir, "test_rejection.md")
+        result = subprocess.run(
+            [sys.executable, os.path.join(RFP_DIR, "rfp_generator.py"),
+             "--type", "goods", "--project", "废标测试项目",
+             "--budget", "500000", "-o", output_path],
+            capture_output=True, text=True, cwd=RFP_DIR
+        )
+        self.assertEqual(result.returncode, 0, f"生成失败: {result.stderr}")
+        content = open(output_path, encoding="utf-8").read()
+        # 应有三类分类标题
+        self.assertIn("资格性废标", content, "应有资格性废标分类")
+        self.assertIn("符合性废标", content, "应有符合性废标分类")
+        self.assertIn("格式性废标", content, "应有格式性废标分类")
+        # 应有一票否决清单标题
+        self.assertIn("一票否决", content, "应有一票否决清单标识")
+
 
 class TestRFPCompliance(unittest.TestCase):
     """测试 rfp_compliance.py"""

@@ -10,3 +10,6 @@ __pycache__/
 *~
 .env
 rfp/samples/real_bids/
+test_results.json
+__pycache__/
+*.pyc
