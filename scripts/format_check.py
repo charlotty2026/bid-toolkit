@@ -246,7 +246,7 @@ def md_to_docx(md_text, output_path, auto_fix=True):
     doc = Document()
     init_doc_styles(doc)
 
-    # 🔧 全角半角自动修复（师父点名的大痛点）
+    # 🔧 全角半角自动修复（负责人点名的大痛点）
     if auto_fix:
         fixed_text, changes = fix_fullwidth_halfwidth(md_text)
         if changes > 0:
