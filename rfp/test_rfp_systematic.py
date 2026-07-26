@@ -13,8 +13,8 @@ import re
 import json
 import tempfile
 
-# 加入rfp模块路径
-RFP_DIR = "/tmp/bid-toolkit/rfp"
+# 加入rfp模块路径（动态获取，兼容不同部署环境）
+RFP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, RFP_DIR)
 
 from rfp_generator import generate_markdown, SCORING_TEMPLATES, DETAILED_SCORING, REJECTION_CLAUSES
