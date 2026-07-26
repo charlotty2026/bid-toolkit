@@ -11,10 +11,10 @@
   - info:   查看知识库概览
 
 用法：
-  python bid_search.py search "物业管理方案" --library ./bid_library/
-  python bid_search.py search "保安 消防" --library ./bid_library/ --top 5 --json
-  python bid_search.py index --library ./bid_library/
-  python bid_search.py info --library ./bid_library/
+  python bid_search.py search "物业管理方案" --library ./samples/
+  python bid_search.py search "保安 消防" --library ./samples/ --top 5 --json
+  python bid_search.py index --library ./samples/
+  python bid_search.py info --library ./samples/
 
 技术说明：
   - BM25: 经典文本相关性排序算法（k1=1.5, b=0.75）
@@ -406,17 +406,17 @@ def main():
     # search
     p_search = sub.add_parser('search', help='关键词搜索')
     p_search.add_argument('query', help='搜索关键词')
-    p_search.add_argument('--library', '-l', default='./bid_library/', help='知识库目录（默认 ./bid_library/）')
+    p_search.add_argument('--library', '-l', default='./samples/', help='知识库目录（默认 ./samples/）')
     p_search.add_argument('--top', '-t', type=int, default=10, help='返回结果数量（默认10）')
     p_search.add_argument('--json', action='store_true', help='JSON 格式输出')
 
     # index
     p_index = sub.add_parser('index', help='建立索引并查看统计')
-    p_index.add_argument('--library', '-l', default='./bid_library/', help='知识库目录')
+    p_index.add_argument('--library', '-l', default='./samples/', help='知识库目录')
 
     # info
     p_info = sub.add_parser('info', help='查看知识库概览')
-    p_info.add_argument('--library', '-l', default='./bid_library/', help='知识库目录')
+    p_info.add_argument('--library', '-l', default='./samples/', help='知识库目录')
 
     args = parser.parse_args()
 

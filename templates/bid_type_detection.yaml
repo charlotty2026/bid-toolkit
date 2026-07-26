@@ -1,0 +1,240 @@
+# 标书类型自动识别规则
+# bid-type-detection.yaml
+# 用于 parse_bid.py 自动识别招标文件属于货物标/服务标/工程标
+# 识别结果决定使用哪个内容大纲模板和检查规则
+
+# ===== 识别规则 =====
+# 按优先级排列，命中即定类型
+# 多信号交叉验证，单一关键词不轻易定性
+
+detection_rules:
+
+  # ===== 工程标识别 =====
+  engineering:
+    name: "工程类"
+    template: "engineering_outline.md"
+    format_template: "engineering.yaml"
+    confidence_threshold: 3  # 至少命中3个信号才定性
+    
+    keywords:
+      # 强信号（每个算2分）
+      strong:
+        - "施工组织设计"
+        - "工程量清单"
+        - "安全生产许可证"
+        - "建造师"
+        - "施工总承包"
+        - "分部分项工程"
+        - "竣工"  # 仅在"竣工验收"上下文中
+        - "地基与基础"
+        - "主体结构"
+        - "建筑装饰装修"
+      
+      # 中信号（每个算1分）
+      medium:
+        - "建设工程"
+        - "建筑工程"
+        - "市政工程"
+        - "道路工程"
+        - "桥梁工程"
+        - "装饰装修"
+        - "安装工程"
+        - "土建"
+        - "施工图"
+        - "工地"
+        - "脚手架"
+        - "混凝土"
+        - "钢筋"
+        - "基坑"
+        - "工期"
+        - "定额"
+        - "造价"
+    
+    # 排除条件：以下关键词大量出现时，可能是货物标而非工程标
+    exclude_if_dominant:
+      - "设备采购"
+      - "货物供货"
+  
+  # ===== 货物标识别 =====
+  goods:
+    name: "货物类"
+    template: "goods_outline.md"
+    format_template: "goods.yaml"
+    confidence_threshold: 3
+    
+    keywords:
+      strong:
+        - "交货期"
+        - "交货地点"
+        - "到货验收"
+        - "安装调试"
+        - "质保期"
+        - "保修期"
+        - "货物清单"
+        - "设备清单"
+        - "产品技术参数"
+        - "原产地"
+        - "制造商"
+        - "代理授权书"
+        - "3C认证"
+        - "生产许可证"
+      
+      medium:
+        - "采购"
+        - "供货"
+        - "设备"
+        - "货物"
+        - "产品"
+        - "品牌"
+        - "型号"
+        - "规格参数"
+        - "出厂价"
+        - "到岸价"
+        - "备品备件"
+        - "易损件"
+        - "运输"
+        - "包装"
+    
+    exclude_if_dominant:
+      - "施工组织设计"
+      - "工程量清单"
+  
+  # ===== 服务标识别 =====
+  service:
+    name: "服务类"
+    template: "service_outline.md"
+    format_template: "government.yaml"
+    confidence_threshold: 3
+    
+    keywords:
+      strong:
+        - "服务方案"
+        - "人员配置"
+        - "劳务派遣"
+        - "人力资源"
+        - "物业管理"
+        - "后勤服务"
+        - "运维服务"
+        - "外包服务"
+        - "服务期"
+        - "服务标准"
+        - "考核办法"
+        - "满意度"
+      
+      medium:
+        - "服务"
+        - "人员"
+        - "岗位"
+        - "管理"
+        - "培训"
+        - "考核"
+        - "排班"
+        - "月费"
+        - "服务费"
+        - "驻场"
+        - "外包"
+    
+    exclude_if_dominant:
+      - "施工组织设计"
+      "交货期"
+
+# ===== 检查规则差异 =====
+# 不同标书类型的特有检查项
+
+type_specific_checks:
+
+  engineering:
+    # 工程标特有检查
+    - id: "eng_safety_license"
+      name: "安全生产许可证检查"
+      rule: "必须提供有效的安全生产许可证"
+      severity: "error"
+    
+    - id: "eng_builder_cert"
+      name: "建造师资格检查"
+      rule: "项目经理须持有相应级别建造师证书"
+      severity: "error"
+    
+    - id: "eng_quantities"
+      name: "工程量清单完整性"
+      rule: "工程量清单须覆盖招标文件全部分部分项"
+      severity: "error"
+    
+    - id: "eng_construction_plan"
+      name: "施工组织设计完整性"
+      rule: "须包含施工方案、进度计划、质量保证、安全文明施工四大块"
+      severity: "warning"
+    
+    - id: "eng_safety_plan"
+      name: "安全文明施工措施"
+      rule: "须包含安全生产管理体系和文明施工措施"
+      severity: "error"
+
+  goods:
+    # 货物标特有检查
+    - id: "goods_sme_manufacturer"
+      name: "中小企业声明函制造商信息"
+      rule: "货物标中小企业声明函须填列所有主材/设备制造商"
+      severity: "error"
+    
+    - id: "goods_warranty"
+      name: "质保期对标检查"
+      rule: "质保期承诺须满足或优于招标文件要求"
+      severity: "error"
+    
+    - id: "goods_delivery"
+      name: "交货期对标检查"
+      rule: "交货期承诺须满足招标文件要求"
+      severity: "error"
+    
+    - id: "goods_tech_params"
+      name: "技术参数响应完整性"
+      rule: "须逐条响应招标文件全部技术参数"
+      severity: "error"
+    
+    - id: "goods_origin"
+      name: "产地/品牌一致性"
+      rule: "报价表中产地品牌须与响应表一致"
+      severity: "warning"
+    
+    - id: "goods_installation"
+      name: "安装调试方案"
+      rule: "如招标要求安装调试，须提供安装调试方案"
+      severity: "warning"
+    
+    - id: "goods_spare_parts"
+      name: "备品备件清单"
+      rule: "须提供质保期内备品备件清单"
+      severity: "warning"
+
+  service:
+    # 服务标特有检查
+    - id: "service_labor_dispatch"
+      name: "劳务派遣证检查"
+      rule: "涉及劳务派遣须提供劳务派遣经营许可证"
+      severity: "error"
+    
+    - id: "service_hr_license"
+      name: "人力资源证检查"
+      rule: "涉及人力资源服务须提供人力资源服务许可证"
+      severity: "error"
+    
+    - id: "service_staffing"
+      name: "人员配置完整性"
+      rule: "人员配置表须覆盖招标文件要求的全部岗位"
+      severity: "error"
+    
+    - id: "service_response_time"
+      name: "响应时间对标"
+      rule: "服务响应时间须满足招标文件要求"
+      severity: "error"
+    
+    - id: "service_sme_self_only"
+      name: "中小企业声明函只填自己"
+      rule: "服务标中小企业声明函只填投标方自己一家"
+      severity: "warning"
+    
+    - id: "service_training"
+      name: "培训方案检查"
+      rule: "如招标要求培训，须提供培训方案"
+      severity: "warning"

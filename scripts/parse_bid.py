@@ -25,8 +25,113 @@ from pathlib import Path
 from datetime import datetime
 
 
-def extract_text_from_pdf(pdf_path):
-    """从PDF提取文本（尝试pymupdf，失败则提示）"""
+def _table_to_markdown(table):
+    """将pdfplumber表格（列表的列表）转为Markdown格式，保留行列结构。
+
+    评分表/废标表/资质表等表格在纯文本提取时行列会打散，
+    转为Markdown后每行是一条完整记录，下游正则可直接匹配。
+    """
+    if not table or not table[0]:
+        return ""
+    cleaned = []
+    for row in table:
+        cleaned_row = [str(cell).strip() if cell else "" for cell in row]
+        cleaned.append(cleaned_row)
+    # 过滤空行
+    cleaned = [row for row in cleaned if any(cell for cell in row)]
+    if not cleaned:
+        return ""
+    lines = []
+    # 表头
+    lines.append("| " + " | ".join(cleaned[0]) + " |")
+    lines.append("| " + " | ".join("---" for _ in cleaned[0]) + " |")
+    # 数据行
+    for row in cleaned[1:]:
+        # 补齐列数（合并单元格可能导致行长度不一致）
+        while len(row) < len(cleaned[0]):
+            row.append("")
+        lines.append("| " + " | ".join(row) + " |")
+    return "\n".join(lines)
+
+
+def extract_tables_from_pdf(pdf_path):
+    """从PDF提取结构化表格数据。
+
+    返回格式：[{"page": int, "headers": list, "rows": list[list], "markdown": str}]
+
+    用途：下游函数可直接按行列访问表格数据，不依赖正则从纯文本中解析。
+    适合评分表/废标表/资质表等关键表格的精准提取。
+    """
+    tables_result = []
+    try:
+        import pdfplumber
+        with pdfplumber.open(pdf_path) as pdf:
+            for page_idx, page in enumerate(pdf.pages):
+                tables = page.extract_tables()
+                for table in tables:
+                    if not table or not table[0]:
+                        continue
+                    # 过滤过小的表格（<2行或<2列=布局噪音）
+                    if len(table) < 2 or len(table[0]) < 2:
+                        continue
+                    cleaned = []
+                    for row in table:
+                        cleaned_row = [str(cell).strip() if cell else "" for cell in row]
+                        cleaned.append(cleaned_row)
+                    cleaned = [row for row in cleaned if any(cell for cell in row)]
+                    if len(cleaned) < 2:
+                        continue
+                    headers = cleaned[0]
+                    rows = cleaned[1:] if len(cleaned) > 1 else []
+                    md = _table_to_markdown(cleaned)
+                    tables_result.append({
+                        "page": page_idx + 1,
+                        "headers": headers,
+                        "rows": rows,
+                        "markdown": md,
+                    })
+    except ImportError:
+        pass  # pdfplumber未安装，静默跳过（extract_text_from_pdf会走fallback）
+    except Exception as e:
+        print(f"表格提取警告：{e}", file=sys.stderr)
+    return tables_result
+
+
+def extract_text_from_pdf(pdf_path, include_tables=True):
+    """从PDF提取文本（pdfplumber主路径，PyMuPDF fallback）。
+
+    pdfplumber优势：表格结构化提取，行列对齐。
+    PyMuPDF fallback：pdfplumber失败时兜底（无表格结构化）。
+
+    include_tables=True时，表格以Markdown格式内嵌在文本中，
+    评分表/废标表等关键表格的行列结构不会被打散。
+    """
+    # 主路径：pdfplumber
+    try:
+        import pdfplumber
+        text_parts = []
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text() or ""
+
+                if include_tables:
+                    tables = page.extract_tables()
+                    if tables:
+                        md_tables = []
+                        for table in tables:
+                            md = _table_to_markdown(table)
+                            if md:
+                                md_tables.append(md)
+                        if md_tables:
+                            page_text += "\n\n" + "\n\n".join(md_tables)
+
+                text_parts.append(page_text)
+
+        return "\n".join(text_parts)
+    except ImportError:
+        pass  # 走fallback
+
+    # Fallback：PyMuPDF（无表格结构化，但至少能提取纯文本）
     try:
         import fitz  # PyMuPDF
         doc = fitz.open(pdf_path)
@@ -36,7 +141,7 @@ def extract_text_from_pdf(pdf_path):
         doc.close()
         return text
     except ImportError:
-        print("错误：需要安装 PyMuPDF：pip install PyMuPDF", file=sys.stderr)
+        print("错误：需要安装 pdfplumber 或 PyMuPDF：pip install pdfplumber", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         print(f"PDF读取失败：{e}", file=sys.stderr)
@@ -562,6 +667,22 @@ def parse_bid_document(file_path):
     text = read_input_file(file_path)
     print(f"文本长度：{len(text)} 字符", file=sys.stderr)
     
+    # PDF文件：提取结构化表格数据，合并到文本流中
+    # 这样下游所有提取函数都能自然消费表格内容（评分表/废标表/资质表等）
+    tables = []
+    if Path(file_path).suffix.lower() == '.pdf':
+        print("正在提取结构化表格...", file=sys.stderr)
+        tables = extract_tables_from_pdf(file_path)
+        if tables:
+            table_md_parts = [t["markdown"] for t in tables if t.get("markdown")]
+            if table_md_parts:
+                text = text + "\n\n" + "\n\n".join(table_md_parts)
+                print(f"表格提取：{len(tables)} 个表格，已合并到文本流", file=sys.stderr)
+            else:
+                print(f"表格提取：{len(tables)} 个表格，但无有效内容", file=sys.stderr)
+        else:
+            print("表格提取：未检测到表格", file=sys.stderr)
+    
     result = {
         "文件名": Path(file_path).name,
         "解析时间": datetime.now().isoformat(),
@@ -573,6 +694,7 @@ def parse_bid_document(file_path):
         "时间节点": extract_timeline(text),
         "资质要求": extract_qualifications(text),
         "保证金": extract_deposit(text),
+        "_表格数据": tables,
     }
     
     # 统计
@@ -583,6 +705,7 @@ def parse_bid_document(file_path):
         "大纲标题_格式": len(result["大纲框架"]["来源_格式"]),
         "评分项": len(result["大纲框架"]["来源_评分项"]),
         "资质要求": len(result["资质要求"]),
+        "表格数": len(tables),
     }
     result["_统计"] = stats
     
@@ -615,6 +738,7 @@ def main():
         print(f"  大纲标题（格式）：{stats['大纲标题_格式']} 个", file=sys.stderr)
         print(f"  评分项：{stats['评分项']} 个", file=sys.stderr)
         print(f"  资质要求：{stats['资质要求']} 条", file=sys.stderr)
+        print(f"  表格数：{stats['表格数']} 个", file=sys.stderr)
     else:
         print(output_json)
 
