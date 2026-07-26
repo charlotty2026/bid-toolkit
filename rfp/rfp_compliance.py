@@ -173,7 +173,7 @@ def check_scoring(text, project_type="services"):
         m = re.search(pattern, text)
         if m:
             start = m.start()
-            next_chapter = re.search(r'\n第[6六][章节]', text[start:])
+            next_chapter = re.search(r'\n[#\s]*第[6六][章节]', text[start:])
             end = start + next_chapter.start() if next_chapter else len(text)
             scoring_section = text[start:end]
             break
@@ -403,7 +403,7 @@ def check_vague_scoring(text):
         m = re.search(pattern, text)
         if m:
             start = m.start()
-            next_chapter = re.search(r'\n第[6六][章节]', text[start:])
+            next_chapter = re.search(r'\n[#\s]*第[6六][章节]', text[start:])
             end = start + next_chapter.start() if next_chapter else len(text)
             scoring_section = text[start:end]
             break
