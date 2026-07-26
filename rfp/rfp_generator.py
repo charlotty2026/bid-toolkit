@@ -300,6 +300,123 @@ def generate_markdown(project_info, project_type="services"):
     return "\n".join(lines)
 
 
+def _convert_numbering(markdown_text, numbering="arabic"):
+    """转换Markdown中的编号列表项格式。
+
+    arabic:  1. 2. 3.       （默认，Word用List Number样式自动编号）
+    multi:   1.1 1.2 1.3     （多级编号，文本内嵌）
+    chinese: 一、 二、 三、   （中文编号，文本内嵌）
+    none:    去掉编号         （纯文本段落）
+    """
+    if numbering == "arabic":
+        return markdown_text
+
+    lines = markdown_text.split('\n')
+    result = []
+    list_counter = 0
+    chapter_num = 0
+    cn_nums = [
+        '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+        '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八',
+        '十九', '二十', '二十一', '二十二', '二十三', '二十四', '二十五',
+        '二十六', '二十七', '二十八', '二十九', '三十',
+    ]
+
+    for line in lines:
+        stripped = line.strip()
+
+        # 追踪章节号（用于 multi 模式）
+        if stripped.startswith('# 第') and '章' in stripped:
+            chapter_num += 1
+            list_counter = 0
+            result.append(line)
+            continue
+
+        # 检测编号列表项（格式：数字. 文本）
+        is_numbered = (
+            bool(stripped)
+            and len(stripped) > 2
+            and stripped[0:2].rstrip('.').isdigit()
+            and '. ' in stripped[:5]
+        )
+
+        if is_numbered:
+            idx = stripped.index('. ')
+            content = stripped[idx + 2:]
+            list_counter += 1
+
+            if numbering == "multi":
+                result.append(f"{chapter_num}.{list_counter} {content}")
+            elif numbering == "chinese":
+                num = cn_nums[list_counter - 1] if list_counter <= len(cn_nums) else str(list_counter)
+                result.append(f"{num}、{content}")
+            elif numbering == "none":
+                result.append(content)
+        else:
+            # 非编号非空行 → 重置列表计数器（空行不重置）
+            if stripped:
+                list_counter = 0
+            result.append(line)
+
+    return '\n'.join(result)
+
+
+def _create_numbering_instance(doc):
+    """为新的编号列表创建独立的编号实例，确保编号从1重新开始。
+
+    python-docx的List Number样式所有段落共用一个编号序列，
+    不会在新列表处重置——第一章编到26，第二章接着从27开始。
+    此函数创建新的numId + startOverride解决该问题。
+    """
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    numbering = doc.part.numbering_part.element
+
+    existing_nums = numbering.findall(qn('w:num'))
+    max_num_id = max([int(n.get(qn('w:numId'))) for n in existing_nums], default=0)
+
+    abstract_nums = numbering.findall(qn('w:abstractNum'))
+    if not abstract_nums:
+        return None
+    abs_id = abstract_nums[0].get(qn('w:abstractNumId'))
+
+    new_num_id = max_num_id + 1
+
+    num = OxmlElement('w:num')
+    num.set(qn('w:numId'), str(new_num_id))
+
+    abs_ref = OxmlElement('w:abstractNumId')
+    abs_ref.set(qn('w:val'), abs_id)
+    num.append(abs_ref)
+
+    lvl_override = OxmlElement('w:lvlOverride')
+    lvl_override.set(qn('w:ilvl'), '0')
+    start_override = OxmlElement('w:startOverride')
+    start_override.set(qn('w:val'), '1')
+    lvl_override.append(start_override)
+    num.append(lvl_override)
+
+    numbering.append(num)
+    return new_num_id
+
+
+def _apply_numbering(paragraph, num_id):
+    """给段落应用指定的编号实例（覆盖样式默认的numId）"""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    pPr = paragraph._element.get_or_add_pPr()
+    numPr = OxmlElement('w:numPr')
+    ilvl = OxmlElement('w:ilvl')
+    ilvl.set(qn('w:val'), '0')
+    numId_el = OxmlElement('w:numId')
+    numId_el.set(qn('w:val'), str(num_id))
+    numPr.append(ilvl)
+    numPr.append(numId_el)
+    pPr.append(numPr)
+
+
 def generate_docx(markdown_text, output_path):
     """将Markdown转为Word文档，标题用原生Heading样式，插入TOC域"""
     try:
@@ -340,9 +457,21 @@ def generate_docx(markdown_text, output_path):
     lines = markdown_text.split('\n')
     in_table = False
     table_rows = []
+    in_numbered_list = False
+    current_num_id = None
 
     for line in lines:
         stripped = line.strip()
+
+        # 判断是否是编号列表项（用于检测新列表起点）
+        is_numbered = (
+            bool(stripped)
+            and len(stripped) > 2
+            and stripped[0:2].rstrip('.').isdigit()
+            and '. ' in stripped[:5]
+        )
+        if not is_numbered:
+            in_numbered_list = False
 
         # 跳过空行
         if not stripped:
@@ -386,9 +515,15 @@ def generate_docx(markdown_text, output_path):
         elif stripped.startswith('- [ ] '):
             p = doc.add_paragraph(style='List Bullet')
             p.add_run(f"☐ {stripped[6:]}")
-        elif stripped[0:2].rstrip('.').isdigit() and '. ' in stripped[:5]:
+        elif is_numbered:
             idx = stripped.index('. ')
-            doc.add_paragraph(stripped[idx+2:], style='List Number')
+            # 新列表起点：创建独立编号实例
+            if not in_numbered_list:
+                current_num_id = _create_numbering_instance(doc)
+                in_numbered_list = True
+            p = doc.add_paragraph(stripped[idx+2:], style='List Number')
+            if current_num_id is not None:
+                _apply_numbering(p, current_num_id)
         else:
             doc.add_paragraph(stripped)
 
@@ -503,6 +638,9 @@ def main():
     parser.add_argument('--config', help='从JSON文件读取项目信息')
     parser.add_argument('-o', '--output', default='招标文件.md', help='输出文件名')
     parser.add_argument('--docx', action='store_true', help='同时生成Word文档')
+    parser.add_argument('--numbering', choices=['arabic', 'multi', 'chinese', 'none'],
+                        default='arabic',
+                        help='编号风格：arabic(1.2.3 默认)/multi(1.1 1.2)/chinese(一、二、)/none(不编号)')
     args = parser.parse_args()
 
     # 收集项目信息
@@ -519,6 +657,10 @@ def main():
 
     # 生成Markdown
     md_text = generate_markdown(project_info, args.type)
+
+    # 编号风格转换（非arabic模式把编号内嵌到文本中）
+    if args.numbering != "arabic":
+        md_text = _convert_numbering(md_text, args.numbering)
 
     # 写入文件
     with open(args.output, 'w', encoding='utf-8') as f:
