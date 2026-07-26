@@ -1,4 +1,4 @@
-# 📝 bid-toolkit — 标书自动化工具包 v3.3
+# 📝 bid-toolkit — 标书自动化工具包 v3.4
 
 > AI写标书不是新鲜事，但"AI按你的格式规范严格生成文档"才是真正的提效。
 
@@ -22,7 +22,9 @@
 | **标书查重** | SimHash算法检测文本相似度，防止串标/雷同 |
 | **判词库管理** | 可积累的禁用词/敏感词/规范词系统，支持AI发现新词+人工审批 |
 | **Mermaid图表** | Markdown中的Mermaid代码块自动渲染为图片插入Word |
-| **多格式模板** | 内置3套模板：政府采购 / 企业投标 / 工程类，一行切换 |
+| **多格式模板** | 内置4套格式模板：政府采购 / 企业投标 / 工程类 / 货物类，一行切换 |
+| **标书类型识别** | 自动识别货物标/服务标/工程标，匹配对应内容大纲和检查规则（v3.4新增） |
+| **三类内容大纲** | 货物标/服务标/工程标差异化章节模板，不再一套模板打天下（v3.4新增） |
 | **自定义配置** | 修改config.yaml即可适配任何招标文件的格式要求 |
 | **下划线保留** | 保留下划线占位符格式，如 `致：_________（招标人）` |
 
@@ -127,7 +129,33 @@ text = preserve_underlines(text, {"致：": "致：上海交通大学"})
 | 标题 | 黑体加粗 |
 | 页边距 | 上下3.00cm 左2.50cm 右2.00cm |
 
-## 自定义配置
+### 货物类模板 (`goods`) v3.4新增
+| 项目 | 规范 |
+|------|------|
+| 正文 | 仿宋小四(12pt) 首行缩进2字符 1.5倍行距 |
+| 标题 | 黑体加粗 |
+| 页边距 | 上下2.54cm 左2.50cm 右2.00cm |
+| 特有配置 | 报价表列定义、中小企业声明函货物模式、质保条款默认值 |
+
+### 标书类型识别 v3.4新增
+
+内置关键词+信号评分机制，自动判断招标文件属于哪种类型：
+
+```bash
+# parse_bid.py 拆解时会自动输出标书类型
+python scripts/parse_bid.py 招标文件.pdf -o requirements.json --pretty
+# 输出包含："bid_type": "goods", "confidence": 5
+```
+
+识别结果决定使用哪个内容大纲模板和专项检查规则：
+
+| 类型 | 内容大纲 | 专项检查项 |
+|------|---------|-----------|
+| 货物标 | goods_outline.md | 制造商信息/质保期/交货期/技术参数/产地品牌一致性 |
+| 服务标 | service_outline.md | 劳务派遣证/人员配置/响应时间/中小企业声明函 |
+| 工程标 | engineering_outline.md | 安全生产许可证/建造师/工程量清单/施工组织设计 |
+
+配置文件：`templates/bid_type_detection.yaml`
 
 编辑 `config.yaml` 即可适配任何招标文件的格式要求：
 
@@ -199,10 +227,10 @@ result = preserve_underlines(text, {"致：": "致：上海交通大学"})
 python scripts/bid_similarity.py compare 标书A.md 标书B.md
 
 # 与历史库比对
-python scripts/bid_similarity.py check 新标书.md --library ./bid_library/
+python scripts/bid_similarity.py check 新标书.md --library ./samples/
 
 # 添加标书到历史库
-python scripts/bid_similarity.py add 标书.md --library ./bid_library/ --name "XX项目"
+python scripts/bid_similarity.py add 标书.md --library ./samples/ --name "XX项目"
 ```
 
 ### 判词库管理（v3.2 新增）
@@ -273,6 +301,8 @@ python scripts/bid_consistency_check.py check 标书.docx --json
 
 | 能力 | bid-toolkit | 易标 OpenBidKit |
 |------|:-----------:|:---------------:|
+| **标书类型识别（货物/服务/工程）** | ✅ v3.4 | ❌ |
+| **三类内容大纲模板** | ✅ v3.4 | ❌ |
 | **Markdown->Word格式生成** | ✅ 35+格式修复函数 | ❌ |
 | **AI生成技术方案** | ❌ | ✅ DeepSeek/火山方舟 |
 | **暗标模式（去公司标识）** | ✅ | ❌ |
@@ -343,41 +373,61 @@ python rfp/rfp_compliance.py --rfp 招标文件.md --type services --format text
 
 ## 项目结构
 
+项目按**甲方/乙方**双角色分区，一眼看懂哪边用哪块：
+
 ```
 bid-toolkit/
-├── README.md              # 本文件
-├── config.yaml            # 格式配置文件（自定义字体/字号/行距）
-├── templates/             # 预设模板
-│   ├── government.yaml    # 政府采购标准模板
-│   ├── enterprise.yaml    # 企业投标通用模板
-│   └── engineering.yaml   # 工程类投标模板
-├── scripts/
-│   ├── bid_engine.py            # Markdown->Word转换引擎（含Mermaid图表支持）
-│   ├── bid_similarity.py        # 标书查重（SimHash）
-│   ├── bid_typo_check.py        # 错别字检测（89对映射+同音字）
-│   ├── bid_consistency_check.py # 前后不一致检测（数字/日期/金额/名称）
-│   ├── keyword_library.py       # 判词库管理（禁用词/敏感词/规范词）
-│   ├── format_check.py           # 全角半角检测与修复
-│   ├── parse_bid.py             # 招标文件拆解（PDF/MD->JSON）
-│   ├── fix_bid_format.py        # Word格式修复（35+函数）
-│   └── verify_pricing.py        # 报价核算
-├── rules/
-│   └── bid_rules.md             # 标书编制铁律（33条，7卷）
-├── docs/
-│   ├── checklist.md             # 标书排版自检清单
-│   └── prompts.md               # AI标书提示词参考（9条铁律+7个场景prompt）
-├── examples/
-│   └── demo_bid.md              # 示例文件
-└── rfp/                          # RFP招标文件生成器（v3.3）
-    ├── rfp_generator.py          # 招标文件生成（货物/服务/工程三类）
-    ├── rfp_compliance.py         # 合规检查（6条红线）
-    ├── rfp_structure.py          # 标准六章结构定义
-    ├── rfp_templates.py          # 评分表/废标条款/采购需求模板
-    ├── standard_structure.json   # 结构框架JSON
-    ├── compliance_rules/         # 合规规则库
-    ├── samples/                  # 公开招标文件样本
-    ├── laws/                     # 相关法律法规
-    └── test_rfp_systematic.py    # 系统性测试
+│
+├── 🏢 乙方工具（投标方）—— 写投标文件
+│   ├── config.yaml                  # 格式配置（字体/字号/行距，改这里适配任何招标要求）
+│   ├── templates/                   # 格式模板 + 内容大纲
+│   │   ├── government.yaml          #   政府采购标准格式
+│   │   ├── enterprise.yaml          #   企业投标通用格式
+│   │   ├── engineering.yaml         #   工程类格式
+│   │   ├── goods.yaml               #   货物类格式（v3.4）
+│   │   ├── goods_outline.md         #   货物标内容大纲（v3.4）
+│   │   ├── service_outline.md       #   服务标内容大纲（v3.4）
+│   │   ├── engineering_outline.md   #   工程标内容大纲（v3.4）
+│   │   └── bid_type_detection.yaml  #   标书类型识别规则（v3.4）
+│   ├── scripts/                     # 核心脚本
+│   │   ├── bid_engine.py            #   Markdown→Word转换引擎
+│   │   ├── parse_bid.py             #   招标文件拆解（PDF/MD→JSON）
+│   │   ├── format_check.py          #   全角半角检测与修复
+│   │   ├── fix_bid_format.py        #   Word格式修复（35+函数）
+│   │   ├── bid_similarity.py        #   标书查重（SimHash）
+│   │   ├── bid_search.py            #   标书知识库搜索（BM25）
+│   │   ├── bid_typo_check.py        #   错别字检测
+│   │   ├── bid_consistency_check.py #   前后不一致检测
+│   │   ├── keyword_library.py       #   判词库管理
+│   │   └── verify_pricing.py        #   报价核算
+│   └── rules/
+│       └── bid_rules.md             # 标书编制铁律（33条，7卷）
+│
+├── 🏛️ 甲方工具（招标方）—— 生成招标文件 + 合规检查
+│   └── rfp/
+│       ├── rfp_generator.py          # 招标文件生成（货物/服务/工程三类）
+│       ├── rfp_compliance.py         # 合规检查（6条红线）
+│       ├── rfp_structure.py          # 标准六章结构定义
+│       ├── rfp_templates.py          # 评分表/废标条款/采购需求模板
+│       ├── standard_structure.json   # 结构框架JSON
+│       ├── compliance_rules/         # 合规规则库
+│       ├── samples/                  # 公开招标文件样本
+│       ├── laws/                     # 相关法律法规
+│       └── test_rfp_systematic.py    # 系统性测试
+│
+├── 📚 共享资源
+│   ├── docs/
+│   │   ├── checklist.md              # 标书排版自检清单
+│   │   ├── prompts.md                # AI标书提示词参考
+│   │   ├── RFP甲方实测报告.md         # RFP模块测试报告
+│   │   └── RFP验证报告.md             # RFP模块验证报告
+│   ├── samples/                      # 示例标书文件（查重历史库默认路径）
+│   ├── examples/
+│   │   └── demo_bid.md               # 演示文件
+│   └── requirements.txt              # Python依赖声明
+│
+├── README.md
+└── LICENSE
 ```
 
 ## 贡献

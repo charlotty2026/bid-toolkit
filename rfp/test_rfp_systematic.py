@@ -22,6 +22,8 @@ from rfp_compliance import run_all_checks, check_exclusionary, check_scoring, ch
 from rfp_structure import get_chapters, PROJECT_TYPES
 
 # 测试用项目信息
+_TEST_RESULTS = {}  # 模块级结果存储，避免test函数return触发PytestReturnNotNoneWarning
+
 SAMPLE_PROJECTS = {
     "goods": {
         "project_name": "上海某医院医疗设备采购项目",
@@ -159,7 +161,8 @@ def test_placeholders():
         for p in unique_placeholders[:10]:
             print(f"      - {p}")
 
-    return results
+    assert len(results) == 3, "应生成3种项目类型的占位符统计"
+    _TEST_RESULTS['placeholders'] = results
 
 
 # ========== 测试2: 核心模板质量 ==========
@@ -239,7 +242,8 @@ def test_core_templates():
             print(f"      子节数: {len(procurement_chapter['sections'])}")
             print(f"      全部为占位符: {'❌ 是' if ptype_results['procurement']['has_content'] else '✅ 有内容'}")
 
-    return results
+    assert len(results) == 3, "应生成3种项目类型的核心模板检查结果"
+    _TEST_RESULTS['core_templates'] = results
 
 
 # ========== 测试3: 三类差异化 ==========
@@ -295,7 +299,8 @@ def test_differentiation():
     print(f"    工程类-服务类额外章节: {diff_2 if diff_2 else '无差异'}")
     print(f"    货物类-工程类额外章节: {diff_3 if diff_3 else '无差异'}")
 
-    return results
+    assert len(results) == 3, "应生成3种项目类型的差异化分析"
+    _TEST_RESULTS['differentiation'] = results
 
 
 # ========== 测试4: 合规检查（6条红线） ==========
@@ -368,7 +373,8 @@ def test_compliance_redlines():
                     if item.get("severity") == "fail":
                         print(f"    ❌ [{check_name}] {item.get('message', '')}")
 
-    return results
+    assert len(results) >= 6, "应检测6条合规红线"
+    _TEST_RESULTS['compliance_redlines'] = results
 
 
 # ========== 测试5: 真实文件对比 ==========
@@ -481,7 +487,8 @@ def test_real_file_comparison():
 
         results[ptype] = ptype_results
 
-    return results
+    assert len(results) == 3, "应对比3种项目类型的真实文件"
+    _TEST_RESULTS['real_file_comparison'] = results
 
 
 # ========== 主函数 ==========
@@ -493,21 +500,27 @@ def main():
     print("=" * 70)
 
     all_results = {}
+    _TEST_RESULTS.clear()
 
     # 测试1: 占位符
-    all_results["placeholders"] = test_placeholders()
+    test_placeholders()
+    all_results["placeholders"] = _TEST_RESULTS['placeholders']
 
     # 测试2: 核心模板
-    all_results["core_templates"] = test_core_templates()
+    test_core_templates()
+    all_results["core_templates"] = _TEST_RESULTS['core_templates']
 
     # 测试3: 三类差异化
-    all_results["differentiation"] = test_differentiation()
+    test_differentiation()
+    all_results["differentiation"] = _TEST_RESULTS['differentiation']
 
     # 测试4: 合规红线
-    all_results["compliance"] = test_compliance_redlines()
+    test_compliance_redlines()
+    all_results["compliance"] = _TEST_RESULTS['compliance_redlines']
 
     # 测试5: 真实文件对比
-    all_results["real_comparison"] = test_real_file_comparison()
+    test_real_file_comparison()
+    all_results["real_comparison"] = _TEST_RESULTS['real_file_comparison']
 
     # 保存完整结果
     output_path = "/tmp/bid-toolkit/rfp/test_results.json"

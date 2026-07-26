@@ -12,8 +12,8 @@
 
 用法：
   python bid_similarity.py compare 文件A.md 文件B.md [--threshold 0.8] [--json]
-  python bid_similarity.py check 新标书.md --library ./bid_library/ [--threshold 0.8] [--json]
-  python bid_similarity.py add 标书.md --library ./bid_library/ --name "项目名"
+  python bid_similarity.py check 新标书.md --library ./samples/ [--threshold 0.8] [--json]
+  python bid_similarity.py add 标书.md --library ./samples/ --name "项目名"
 
 技术说明：
   - SimHash: 64位指纹，汉明距离≤3视为相似
@@ -898,10 +898,10 @@ def main():
   python bid_similarity.py compare 标书A.md 标书B.md
 
   # 检查新标书和历史库的相似度
-  python bid_similarity.py check 新标书.md --library ./bid_library/
+  python bid_similarity.py check 新标书.md --library ./samples/
 
   # 添加标书到历史库
-  python bid_similarity.py add 旧标书.md --library ./bid_library/ --name "2024市政项目"
+  python bid_similarity.py add 旧标书.md --library ./samples/ --name "2024市政项目"
 
   # 输出JSON格式
   python bid_similarity.py compare A.md B.md --json > report.json
@@ -925,8 +925,8 @@ def main():
     # check 子命令
     p_check = subparsers.add_parser('check', help='和库目录下所有文件比对')
     p_check.add_argument('file', help='待检查的标书文件')
-    p_check.add_argument('--library', default='./bid_library/',
-                         help='历史库目录，默认 ./bid_library/')
+    p_check.add_argument('--library', default='./samples/',
+                         help='历史库目录，默认 ./samples/')
     p_check.add_argument('--threshold', type=float, default=0.8,
                          help='相似度阈值，默认0.8（80%%）')
     p_check.add_argument('--json', action='store_true', help='输出JSON格式')
@@ -934,8 +934,8 @@ def main():
     # add 子命令
     p_add = subparsers.add_parser('add', help='添加标书到历史库')
     p_add.add_argument('file', help='标书文件路径')
-    p_add.add_argument('--library', default='./bid_library/',
-                       help='历史库目录，默认 ./bid_library/')
+    p_add.add_argument('--library', default='./samples/',
+                       help='历史库目录，默认 ./samples/')
     p_add.add_argument('--name', default=None, help='库中显示名称（默认用文件名）')
 
     # deep 子命令
