@@ -120,6 +120,15 @@ detection_rules:
         - "服务标准"
         - "考核办法"
         - "满意度"
+        - "保安"
+        - "消防"
+        - "专职消防队"
+        - "保洁"
+        - "清洁"
+        - "咨询"
+        - "餐饮"
+        - "团餐"
+        - "护工"
       
       medium:
         - "服务"
@@ -136,7 +145,7 @@ detection_rules:
     
     exclude_if_dominant:
       - "施工组织设计"
-      "交货期"
+      - "交货期"
 
 # ===== 检查规则差异 =====
 # 不同标书类型的特有检查项
@@ -209,14 +218,9 @@ type_specific_checks:
 
   service:
     # 服务标特有检查
-    - id: "service_labor_dispatch"
-      name: "劳务派遣证检查"
-      rule: "涉及劳务派遣须提供劳务派遣经营许可证"
-      severity: "error"
-    
-    - id: "service_hr_license"
-      name: "人力资源证检查"
-      rule: "涉及人力资源服务须提供人力资源服务许可证"
+    - id: "service_subcontract_permit"
+      name: "分包许可与中小企业声明函检查"
+      rule: "确认招标文件是否允许分包。不允许分包时，中小企业声明函只填投标方自己一家；允许分包时须填全所有分包方"
       severity: "error"
     
     - id: "service_staffing"
@@ -229,12 +233,44 @@ type_specific_checks:
       rule: "服务响应时间须满足招标文件要求"
       severity: "error"
     
-    - id: "service_sme_self_only"
-      name: "中小企业声明函只填自己"
-      rule: "服务标中小企业声明函只填投标方自己一家"
-      severity: "warning"
-    
     - id: "service_training"
       name: "培训方案检查"
       rule: "如招标要求培训，须提供培训方案"
       severity: "warning"
+    
+    # 子类型资质检查（按招标文件关键词自动匹配）
+    - id: "service_human_resources_qual"
+      name: "人力资源类资质检查"
+      rule: "涉及劳务派遣或人力资源服务的，须提供劳务派遣经营许可证和人力资源服务许可证"
+      severity: "error"
+      condition_keywords: ["劳务派遣", "人力资源", "劳务外包"]
+    
+    - id: "service_property_qual"
+      name: "物业管理资质检查"
+      rule: "涉及物业管理的，须提供物业服务企业资质证书"
+      severity: "error"
+      condition_keywords: ["物业管理", "物业服务"]
+    
+    - id: "service_security_qual"
+      name: "安保服务资质检查"
+      rule: "涉及保安服务的，须提供保安服务许可证"
+      severity: "error"
+      condition_keywords: ["保安", "安保", "消防", "专职消防队"]
+    
+    - id: "service_it_qual"
+      name: "IT运维资质检查"
+      rule: "涉及IT运维或信息化服务的，须提供信息系统运维相关资质（如ITSS）"
+      severity: "warning"
+      condition_keywords: ["运维", "IT", "信息化", "系统集成", "软件"]
+    
+    - id: "service_cleaning_qual"
+      name: "保洁服务资质检查"
+      rule: "涉及保洁/清洁服务的，须提供相关清洁服务资质"
+      severity: "warning"
+      condition_keywords: ["保洁", "清洁", "环卫"]
+    
+    - id: "service_consulting_qual"
+      name: "咨询服务资质检查"
+      rule: "涉及咨询/评估/审计类服务的，须提供相应行业资质"
+      severity: "warning"
+      condition_keywords: ["咨询", "评估", "审计", "顾问"]"
