@@ -110,8 +110,6 @@ detection_rules:
       strong:
         - "服务方案"
         - "人员配置"
-        - "劳务派遣"
-        - "人力资源"
         - "物业管理"
         - "后勤服务"
         - "运维服务"
@@ -142,6 +140,8 @@ detection_rules:
         - "服务费"
         - "驻场"
         - "外包"
+        - "劳务派遣"
+        - "人力资源"
     
     exclude_if_dominant:
       - "施工组织设计"
@@ -273,4 +273,4 @@ type_specific_checks:
       name: "咨询服务资质检查"
       rule: "涉及咨询/评估/审计类服务的，须提供相应行业资质"
       severity: "warning"
-      condition_keywords: ["咨询", "评估", "审计", "顾问"]"
+      condition_keywords: ["咨询", "评估", "审计", "顾问"]
