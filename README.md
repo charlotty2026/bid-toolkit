@@ -1,7 +1,11 @@
-# 📝 bid-toolkit — 标书自动化工具包 v3.4
+# 📝 bid-toolkit — 标书自动化工具包 v3.5
 
 > AI写标书不是新鲜事，但"AI按你的格式规范严格生成文档"才是真正的提效。
+>
+> v3.5重大更新：投标文件一键生成器 + 踩坑/资质/下划线三大检查器 + 招标文件深度解析 + 四套提示词模板
 
+> 💡 **项目定位：轻量级可复用skill，Agent直接调用脚本即可，无需安装大型应用或配置LLM。**
+> 
 ## 这是什么
 
 一套面向投标从业者的标书自动化工具链，覆盖从 **Markdown写稿 → Word生成 → 格式自检 → 质量质检** 的完整流程。
@@ -25,6 +29,12 @@
 | **多格式模板** | 内置4套格式模板：政府采购 / 企业投标 / 工程类 / 货物类，一行切换 |
 | **标书类型识别** | 自动识别货物标/服务标/工程标，匹配对应内容大纲和检查规则（v3.4新增） |
 | **三类内容大纲** | 货物标/服务标/工程标差异化章节模板，不再一套模板打天下（v3.4新增） |
+| **投标文件生成器** | 招标文件→投标文件初稿一键生成，7步流水线（解析→类型检测→大纲→素材→LLM生成→组装→Word），支持断点续生成（v3.5新增） |
+| **踩坑检查器** | 15条规则扫描投标文件，检测绝对化用语/资质过期/人员冲突/金额大小写不一致等常见踩坑问题（v3.5新增） |
+| **资质响应检查器** | 对比招标要求与投标文件，检查资质是否完整响应、证书有效期是否覆盖项目期（v3.5新增） |
+| **下划线格式检查器** | 检查Word文档下划线格式是否符合配置规则，检测遗漏和类型不符（v3.5新增） |
+| **招标文件深度解析** | 新增评分项/废标条款/资质要求专项提取，输出结构化JSON（v3.5增强） |
+| **四套提示词模板** | 项目分析/技术方案/商务标/自审，可直接用于LLM生成投标文件（v3.5新增） |
 | **自定义配置** | 修改config.yaml即可适配任何招标文件的格式要求 |
 | **下划线保留** | 保留下划线占位符格式，如 `致：_________（招标人）` |
 
@@ -304,12 +314,15 @@ python scripts/bid_consistency_check.py check 标书.docx --json
 | **标书类型识别（货物/服务/工程）** | ✅ v3.4 | ❌ |
 | **三类内容大纲模板** | ✅ v3.4 | ❌ |
 | **Markdown->Word格式生成** | ✅ 35+格式修复函数 | ❌ |
-| **AI生成技术方案** | ❌ | ✅ DeepSeek/火山方舟 |
+| **AI生成投标文件** | ✅ v3.5 一键生成 | ✅ DeepSeek/火山方舟 |
+| **踩坑/资质/下划线检查** | ✅ v3.5 三套检查器 | ❌ |
+| **提示词模板** | ✅ v3.5 四套 | ❌ |
 | **暗标模式（去公司标识）** | ✅ | ❌ |
 | **桌面GUI** | ❌ 命令行 | ✅ Electron桌面应用 |
 | **全角半角检测修复** | ✅ | ❌ |
 | **图文图表生成** | ❌ | ✅ |
 | **招标文件拆解->JSON** | ✅ | ❌ |
+| **招标文件拆解→评分项** | ✅ v2.5c | ❌ |
 | **错别字检测** | ✅ v3.3 | ✅ |
 | **前后不一致检测** | ✅ v3.3 | ✅ |
 | **标书查重** | ✅ SimHash | ✅ 元数据+目录+正文+图片 |
@@ -364,6 +377,147 @@ python rfp/rfp_compliance.py --rfp 招标文件.md --type services --format text
 
 ---
 
+## 投标文件生成器（v3.5 新增）
+
+从"拆解招标文件"到"生成投标文件初稿"——一键打通全链路。
+
+### 核心理念
+
+投标文件80%是结构化骨架（商务标模板+技术标大纲），20%是需人工填充的关键内容。生成器自动完成80%的骨架搭建，把20%需手动填写的字段提取为`{占位符}`并汇总成`needs_manual`报告，人只补关键数据。
+
+### 用法
+
+```bash
+# 一键生成投标文件（招标文件→投标文件初稿）
+python scripts/bid_generator.py generate \
+  --rfp 招标文件.pdf \
+  --company company_profile/ \
+  --output 投标文件.md
+
+# 生成后自动转Word
+python scripts/bid_generator.py generate \
+  --rfp 招标文件.pdf \
+  --company company_profile/ \
+  --output 投标文件.md \
+  --docx
+
+# 断点续生成（中断后从上次位置继续）
+python scripts/bid_generator.py generate \
+  --rfp 招标文件.pdf \
+  --company company_profile/ \
+  --resume
+
+# 仅解析招标文件（不生成内容）
+python scripts/bid_generator.py parse --rfp 招标文件.pdf -o 招标摘要.json
+```
+
+### 7步流水线
+
+```
+招标文件.pdf
+    ↓
+1. parse_bid 解析 → 结构化JSON（格式要求/废标条款/评分项/资质要求）
+    ↓
+2. 类型检测 → 货物标/服务标/工程标（信号评分制）
+    ↓
+3. 加载大纲 → 对应类型的内容大纲模板（goods/service/engineering_outline.md）
+    ↓
+4. 加载素材 → company_profile/ 下的企业信息/资质/踩坑清单
+    ↓
+5. LLM生成技术标 → 逐章节生成（3次重试），严格对标评分项
+    ↓
+6. 组装Markdown → 商务标（模板填充）+ 技术标（LLM生成）+ 其他
+    ↓
+7. 可选Word转换 → 调用bid_engine.py生成格式化Word文档
+```
+
+### 关键特性
+
+- **断点续生成**：每章节生成后保存checkpoint，中断后`--resume`从断点继续
+- **降级模式**：未配置API key时，技术标全用模板+warning，不阻塞生成
+- **占位符汇总**：所有`{占位符}`汇总到`needs_manual.txt`，列出字段名/所在章节/填写说明
+- **商务标不调LLM**：商务标格式固定（投标函/报价表等），纯模板填充避免AI编数据
+- **提示词模板**：`docs/prompts/` 下4套提示词模板，可自定义或替换
+
+### 提示词模板（v3.5 新增）
+
+| 模板 | 用途 | 输入变量 |
+|------|------|---------|
+| `project_analysis.md` | 解析招标文件，提炼8项结构化摘要 | `{rfp_content}` |
+| `technical_proposal.md` | 逐章节生成技术标内容 | `{section_title}` `{section_requirements}` `{rfp_summary}` `{company_profile}` |
+| `commercial_bid.md` | 商务标表格填写指引 | `{rfp_summary}` |
+| `self_review.md` | 投标初稿自审，输出5类检查清单 | `{bid_content}` `{rfp_summary}` |
+
+## 质量检查工具集（v3.5 新增）
+
+生成投标文件后，用三套检查器做自动质检：
+
+### 踩坑检查器
+
+15条规则扫描投标文件，覆盖标书编制中最常见的踩坑问题：
+
+```bash
+python scripts/pitfall_check.py check 投标文件.md
+python scripts/pitfall_check.py check 投标文件.docx --json
+```
+
+| 规则类别 | 检测内容 |
+|---------|---------|
+| 绝对化用语 | 保证中标/100%成功率/国内领先/国际先进 |
+| 人员冲突 | 项目经理同时担任多个项目/同一人员出现在不同岗位 |
+| 资质失效 | ISO证书/安全生产许可证等过期 |
+| 虚假承诺 | 响应时间优于招标要求但无依据 |
+| 暗标泄密 | 暗标中包含公司名称/标识 |
+| 金额错误 | 大小写不一致 |
+| 法规失效 | 引用已废止的法规标准 |
+| 时间矛盾 | 承诺时间与合同要求矛盾 |
+
+支持从 `company_profile/pitfalls.md` 加载自定义规则。
+
+### 资质响应检查器
+
+对比招标文件要求与投标文件实际响应：
+
+```bash
+python scripts/qualification_check.py check 投标文件.md --rfp 招标摘要.json
+python scripts/qualification_check.py check 投标文件.md --rfp 招标摘要.json --json
+```
+
+检查项：
+- 招标要求的每项资质是否在投标文件中有对应响应
+- 资质证书有效期是否覆盖项目期（即将到期/已过期）
+- 18种常见资质证书的别名映射（ISO9001/安全生产许可证/劳务派遣证等）
+
+### 下划线格式检查器
+
+检查Word文档中的下划线格式是否符合配置规则：
+
+```bash
+python scripts/underline_check.py check 投标文件.docx
+python scripts/underline_check.py check 投标文件.docx --config user_config.yaml --json
+```
+
+检测内容：
+- 应有下划线但未找到（漏填）
+- 下划线类型不符（期望single，实际double等）
+- 下划线文本与配置规则不匹配
+
+### 招标文件深度解析（v3.5 增强）
+
+parse_bid.py 新增3个专项提取函数：
+
+```bash
+# 原有功能不变，JSON输出新增3个字段
+python scripts/parse_bid.py 招标文件.pdf -o 招标摘要.json --pretty
+```
+
+新增JSON字段：
+- `scoring_items`：评分项列表（类别/项目/分值/评审标准）
+- `disqualification_clauses`：废标条款列表（条款内容/来源章节）
+- `qualification_requirements`：资质要求列表（要求内容/必备或可选/所需证书）
+
+---
+
 ## 适用场景
 
 - 投标文件编写与排版
@@ -391,7 +545,8 @@ bid-toolkit/
 │   │   └── bid_type_detection.yaml  #   标书类型识别规则（v3.4）
 │   ├── scripts/                     # 核心脚本
 │   │   ├── bid_engine.py            #   Markdown→Word转换引擎
-│   │   ├── parse_bid.py             #   招标文件拆解（PDF/MD→JSON）
+│   │   ├── bid_generator.py         #   投标文件生成器（v3.5）
+│   │   ├── parse_bid.py             #   招标文件拆解（PDF/MD→JSON，v3.5增强）
 │   │   ├── format_check.py          #   全角半角检测与修复
 │   │   ├── fix_bid_format.py        #   Word格式修复（35+函数）
 │   │   ├── bid_similarity.py        #   标书查重（SimHash）
@@ -399,7 +554,16 @@ bid-toolkit/
 │   │   ├── bid_typo_check.py        #   错别字检测
 │   │   ├── bid_consistency_check.py #   前后不一致检测
 │   │   ├── keyword_library.py       #   判词库管理
+│   │   ├── pitfall_check.py         #   踩坑检查器（v3.5）
+│   │   ├── qualification_check.py   #   资质响应检查器（v3.5）
+│   │   ├── underline_check.py       #   下划线格式检查器（v3.5）
 │   │   └── verify_pricing.py        #   报价核算
+│   ├── docs/
+│   │   └── prompts/                 #   提示词模板（v3.5）
+│   │       ├── project_analysis.md  #     项目分析提示词
+│   │       ├── technical_proposal.md #     技术方案生成提示词
+│   │       ├── commercial_bid.md    #     商务标生成提示词
+│   │       └── self_review.md       #     自审提示词
 │   └── rules/
 │       └── bid_rules.md             # 标书编制铁律（33条，7卷）
 │
