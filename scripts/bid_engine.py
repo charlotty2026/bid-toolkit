@@ -535,8 +535,6 @@ def strip_md_residue(text):
     text = re.sub(r'~~(.+?)~~', r'\1', text)
     # 粗体
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-    # 斜体（必须在**之后处理）
-    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', text)
     # 行内代码
     text = re.sub(r'`([^`]+)`', r'\1', text)
     # 行首引用

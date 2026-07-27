@@ -146,10 +146,8 @@ def strip_md_residue(text):
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1（\2）', text)
     # 删除线 ~~text~~
     text = re.sub(r'~~(.+?)~~', r'\1', text)
-    # 粗体 **text**
+    # 粗体 **text**（标书常用，优先处理）
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-    # 斜体 *text*（必须在**之后处理）
-    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', text)
     # 行内代码 `text`
     text = re.sub(r'`([^`]+)`', r'\1', text)
     # 行首引用 >
