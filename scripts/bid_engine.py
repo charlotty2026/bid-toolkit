@@ -255,11 +255,19 @@ FULLWIDTH_TRANS = str.maketrans(
 )
 
 def fix_punctuation(text):
+    """全角半角自动修复，跳过编号和小数中的点号"""
     fixed = text.translate(FULLWIDTH_TRANS)
     result = []
     in_cn = True
     changes = 0
-    for ch in fixed:
+    for i, ch in enumerate(fixed):
+        # 点号特殊处理：前后都是数字时不替换（编号1.1、小数3.14等）
+        if ch == '.' and i > 0 and i < len(fixed) - 1:
+            prev_ch = fixed[i - 1]
+            next_ch = fixed[i + 1]
+            if prev_ch.isdigit() and next_ch.isdigit():
+                result.append(ch)
+                continue
         if ch in HALF_TO_FULL and in_cn:
             result.append(HALF_TO_FULL[ch])
             changes += 1
