@@ -86,7 +86,7 @@ python scripts/bid_engine.py 你的标书.md --template engineering -o 输出.do
 python scripts/bid_engine.py 你的标书.md --config my_config.yaml -o 输出.docx
 
 # 仅扫描全角半角（不生成Word）
-python scripts/format_check.py 你的标书.md --scan
+python scripts/md2docx.py 你的标书.md --scan
 
 # 暗标模式（去公司标识）
 python scripts/bid_engine.py 你的标书.md --暗标 -o 输出.docx
@@ -547,7 +547,7 @@ bid-toolkit/
 │   │   ├── bid_engine.py            #   Markdown→Word转换引擎
 │   │   ├── bid_generator.py         #   投标文件生成器（v3.5）
 │   │   ├── parse_bid.py             #   招标文件拆解（PDF/MD→JSON，v3.5增强）
-│   │   ├── format_check.py          #   全角半角检测与修复
+│   │   ├── md2docx.py               #   Markdown→Word转换（含全角半角扫描修复）
 │   │   ├── fix_bid_format.py        #   Word格式修复（35+函数）
 │   │   ├── bid_similarity.py        #   标书查重（SimHash）
 │   │   ├── bid_search.py            #   标书知识库搜索（BM25）

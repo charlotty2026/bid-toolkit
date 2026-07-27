@@ -92,10 +92,10 @@
 
 ```bash
 # 扫描全角半角问题
-python scripts/format_check.py 你的标书.md --scan
+python scripts/md2docx.py 你的标书.md --scan
 
 # 一键修复全角半角
-python scripts/format_check.py 你的标书.md --fix
+python scripts/md2docx.py 你的标书.md --fix
 
 # Markdown → Word（按config.yaml配置生成）
 python scripts/bid_engine.py 你的标书.md -o 输出.docx

@@ -514,6 +514,11 @@ def main():
     # 生成Markdown
     md_text = generate_markdown(project_info, args.type, scoring_override)
 
+    # 扩展名校验：不带 --docx 时输出内容就是 Markdown，强制 .md 后缀防误导
+    if not args.docx and args.output.lower().endswith('.docx'):
+        args.output = args.output.rsplit('.', 1)[0] + '.md'
+        print(f"⚠️ 未加 --docx，输出内容为 Markdown，文件名已自动改为 {args.output}")
+
     # 写入文件
     with open(args.output, 'w', encoding='utf-8') as f:
         f.write(md_text)
