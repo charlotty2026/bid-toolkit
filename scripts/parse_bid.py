@@ -968,7 +968,13 @@ def extract_scoring_items(text: str, tables: list[dict] | None = None) -> list[d
     if tables:
         table_items = extract_scoring_items_from_tables(tables)
         if table_items:
-            return table_items
+            items.extend(table_items)
+            # 已知从表格里成功提取的评分项（category+item 用于去重）
+            table_keys = {(it.get('category',''), it.get('item','').strip()) for it in table_items}
+        else:
+            table_keys = set()
+    else:
+        table_keys = set()
 
     # 评分类别关键词
     category_keywords: dict[str, list[str]] = {
@@ -1030,6 +1036,10 @@ def extract_scoring_items(text: str, tables: list[dict] | None = None) -> list[d
             continue
 
         category = _guess_category(line + ' ' + item_name)
+        # 去重：跳过表格已提取的项
+        dup_key = (category, item_name.strip())
+        if dup_key in table_keys:
+            continue
         items.append({
             'category': category,
             'item': item_name,
@@ -1117,6 +1127,10 @@ def extract_scoring_items(text: str, tables: list[dict] | None = None) -> list[d
                     if not any(s in combined2 for s in scoring_section_names2):
                         continue
                 cat = current_category or _guess_category(item_name)
+                # 去重：跳过表格已提取的项
+                dup_key = (cat, item_name.strip())
+                if dup_key in table_keys:
+                    continue
                 items.append({
                     'category': cat,
                     'item': item_name,
