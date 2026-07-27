@@ -127,6 +127,14 @@ detection_rules:
         - "餐饮"
         - "团餐"
         - "护工"
+        - "档案整理"
+        - "档案数字化"
+        - "土壤调查"
+        - "环保咨询"
+        - "工程咨询"
+        - "技术评估"
+        - "消防队"
+        - "消防值守"
       
       medium:
         - "服务"
@@ -142,6 +150,10 @@ detection_rules:
         - "外包"
         - "劳务派遣"
         - "人力资源"
+        - "数字化"
+        - "检测"
+        - "评估"
+        - "值守"
     
     exclude_if_dominant:
       - "施工组织设计"
@@ -274,3 +286,22 @@ type_specific_checks:
       rule: "涉及咨询/评估/审计类服务的，须提供相应行业资质"
       severity: "warning"
       condition_keywords: ["咨询", "评估", "审计", "顾问"]
+    
+    # 新增子类型检查
+    - id: "service_archive_qual"
+      name: "档案服务资质检查"
+      rule: "涉及档案整理/数字化的，如项目涉密须提供国家秘密载体印制资质证书"
+      severity: "error"
+      condition_keywords: ["档案整理", "档案数字化", "档案管理"]
+    
+    - id: "service_survey_qual"
+      name: "测绘/调查类资质检查"
+      rule: "涉及土壤调查/测绘的，须提供相应等级测绘资质证书"
+      severity: "error"
+      condition_keywords: ["土壤调查", "测绘", "土地整治", "土地复垦", "测量"]
+    
+    - id: "service_fire_qual"
+      name: "消防服务人员持证检查"
+      rule: "涉及消防服务的，关键岗位人员须持有消防员职业资格证或消防设施操作员证"
+      severity: "error"
+      condition_keywords: ["专职消防队", "消防值守", "消防员", "消防服务"]
