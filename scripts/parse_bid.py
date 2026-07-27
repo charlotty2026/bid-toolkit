@@ -661,6 +661,747 @@ def extract_deposit(text):
     return deposit
 
 
+# ============================================================
+#  v3.5 新增：结构化提取函数
+# ============================================================
+
+def extract_scoring_items_from_tables(tables: list[dict]) -> list[dict]:
+    """从 pdfplumber 提取的结构化表格中识别评分表并提取评分项。
+
+    v2.5 修复：
+    - 续表合并优先于col_map检查（修复pdfplumber headers错位）
+    - 候选表头搜索排除须知条款表（序号>10的候选直接跳过）
+    - 评分描述词验证只在item字段中检查
+    - 排除文件清单和合计行
+
+    返回：[{category: '', item: str, score: float, criteria: str}, ...]
+    """
+    ITEM_COL_EXACT = {'评分内容', '评分要素', '评分因素', '评审内容', '评分项目', '评审项目'}
+    SCORE_COL_EXACT = {'分值', '分数', '得分', '权重', '权值', '权', '满分'}
+    CRITERIA_COL_EXACT = {'评分标准', '评审标准', '评分细则', '评审细则', '评分依据', '评审依据',
+                          '标准', '细则', '依据', '要求', '说明', '描述'}
+    ITEM_COL_KEYS = {'评分', '内容', '要素', '因素', '项目', '评审', '指标'}
+    SCORE_COL_KEYS = {'分值', '分数', '得分', '权重', '权值', '权', '满分'}
+    CRITERIA_COL_KEYS = {'标准', '细则', '依据', '要求', '说明', '描述'}
+    FILELIST_EXCLUDE = {'附件', '备注', '目录', '格式自拟', '格式见', '投标人须知', '投标文件格式'}
+    SCORING_DESC_WORDS = {'分', '得分', '满分', '扣', '加分', '减分', '评分', '权重'}
+    SCORING_SECTION_NAMES = [
+        '技术', '商务', '价格', '资信', '业绩', '方案', '服务',
+        '响应', '报价', '资质', '证书', '人员', '团队', '管理'
+    ]
+
+    def _classify_header(header_text: str) -> str:
+        h = re.sub(r"[\s\n]+", "", header_text).strip()
+        h_lower = h.lower()
+        if h in ITEM_COL_EXACT:
+            return "item"
+        if h in SCORE_COL_EXACT:
+            return "score"
+        if h in CRITERIA_COL_EXACT:
+            return "criteria"
+        if re.match(r"^\d+$", h):
+            try:
+                num = int(h)
+                if 0 <= num <= 100:
+                    return "score"
+            except:
+                pass
+            return "index"
+        if any(k in h_lower for k in ITEM_COL_KEYS):
+            return "item"
+        if any(k in h_lower for k in SCORE_COL_KEYS):
+            return "score"
+        if any(k in h_lower for k in CRITERIA_COL_KEYS):
+            return "criteria"
+        if "序号" in h_lower or h == "序":
+            return "index"
+        return "unknown"
+
+    def _build_col_map(hdrs: list) -> dict:
+        col_map = {}
+        for idx, h in enumerate(hdrs):
+            ctype = _classify_header(str(h))
+            if ctype in ("item", "score", "criteria") and ctype not in col_map:
+                col_map[ctype] = idx
+        return col_map
+
+    def _is_scoring_table(t: dict) -> bool:
+        headers = t.get("headers", [])
+        rows = t.get("rows", [])
+        all_text = " ".join(str(c) for c in headers if c)
+        for r in rows:
+            all_text += " ".join(str(c) for c in r if c)
+        return any(kw in all_text for kw in ["评分", "分值", "评审", "打分", "评标", "权值", "权重", "满分"])
+
+    def _should_exclude(t: dict) -> bool:
+        rows = t.get("rows", [])
+        exclude_count = 0
+        seen = set()
+        for r in rows:
+            row_text = " ".join(str(c) for c in r if c)
+            for ex_word in FILELIST_EXCLUDE:
+                if ex_word in row_text and row_text not in seen:
+                    exclude_count += 1
+                    seen.add(row_text)
+                    break
+        return exclude_count >= 2
+
+    def _headers_look_like_data_row(hdrs: list) -> bool:
+        """判断headers是否实际上是数据行（pdfplumber错位）"""
+        if len(hdrs) < 3:
+            return False
+        first = str(hdrs[0]).strip().replace("\n", " ")
+        last = str(hdrs[-1]).strip().replace("\n", " ")
+        # 第一列必须是纯数字
+        if not re.match(r"^\d+$", first):
+            return False
+        # 最后一列必须是纯数字（分值）
+        if not re.match(r"^\d+$", last):
+            return False
+        try:
+            first_num = int(first)
+            last_num = int(last)
+            # 分值必须在0-100范围内
+            if not (0 <= last_num <= 100):
+                return False
+            # 第一列序号必须>1（续表的序号从2开始）
+            if first_num > 1:
+                return True
+        except:
+            return False
+        return False
+
+    # 预处理：合并相邻评分续表
+    merged_tables = []
+    for t in tables:
+        if not _is_scoring_table(t):
+            continue
+        if _should_exclude(t):
+            continue
+
+        # v2.5: 续表合并优先于col_map检查
+        # 先检查当前表headers是否像数据行（pdfplumber将数据行误识别为headers）
+        if merged_tables and _headers_look_like_data_row(t.get("headers", [])):
+            prev = merged_tables[-1]
+            prev_map = _build_col_map(prev.get("headers", []))
+            if "item" in prev_map and "score" in prev_map:
+                # 将当前headers作为数据行加入前一个表，再合并所有rows
+                prev["rows"] = prev.get("rows", []) + [t.get("headers", [])] + t.get("rows", [])
+                continue
+
+        col_map = _build_col_map(t.get("headers", []))
+
+        if "item" in col_map and "score" in col_map:
+            merged_tables.append(t)
+            continue
+
+        merged_tables.append(t)
+
+    items: list[dict] = []
+
+    for table in merged_tables:
+        headers = table.get("headers", [])
+        rows = table.get("rows", [])
+        if not headers and not rows:
+            continue
+
+        col_map = _build_col_map(headers)
+
+        # v2.5: 候选表头搜索 - 排除须知条款表
+        # 如果当前表头没有item+score，在前3行中找候选表头
+        if "item" not in col_map or "score" not in col_map:
+            for candidate_idx in range(min(3, len(rows))):
+                candidate = rows[candidate_idx]
+                candidate_map = _build_col_map(candidate)
+                if "item" not in candidate_map or "score" not in candidate_map:
+                    continue
+
+                c_item_idx = candidate_map["item"]
+                c_score_idx = candidate_map["score"]
+
+                # v2.5: 排除须知条款表 - 候选行中score列如果是纯数字且>10，大概率是须知条款序号
+                candidate_score_text = str(candidate[c_score_idx]).strip() if c_score_idx < len(candidate) else ""
+                score_m = re.match(r"^(\d+)$", candidate_score_text)
+                if score_m:
+                    candidate_score_num = int(score_m.group(1))
+                    # 须知条款表的"序号"列常为13-99，评分表的序号一般1-10
+                    if candidate_score_num > 10:
+                        continue
+
+                # 验证候选表头后第一行数据是否有效
+                valid_candidate = True
+                if candidate_idx + 1 < len(rows):
+                    first_data_row = rows[candidate_idx + 1]
+                    if isinstance(first_data_row, (list, tuple)):
+                        if c_item_idx < len(first_data_row) and first_data_row[c_item_idx]:
+                            first_item = str(first_data_row[c_item_idx]).strip().replace("\n", " ")
+                            # 数据行的item不应该是纯数字
+                            if re.match(r"^\d+$", first_item):
+                                valid_candidate = False
+                        if valid_candidate and c_score_idx < len(first_data_row) and first_data_row[c_score_idx]:
+                            first_score_text = str(first_data_row[c_score_idx]).strip()
+                            if not re.search(r"\d+(?:\.\d+)?", first_score_text):
+                                valid_candidate = False
+
+                if valid_candidate:
+                    headers = candidate
+                    col_map = candidate_map
+                    rows = rows[candidate_idx + 1:]
+                    break
+
+        if "item" not in col_map or "score" not in col_map:
+            continue
+
+        item_idx = col_map["item"]
+        score_idx = col_map["score"]
+        criteria_idx = col_map.get("criteria", -1)
+
+        last_item = ""
+        last_score = None
+        table_items: list[dict] = []
+        has_valid_score = False
+
+        for row in rows:
+            if not isinstance(row, (list, tuple)) or len(row) <= max(item_idx, score_idx):
+                continue
+
+            raw_item = str(row[item_idx]).strip().replace("\n", " ") if row[item_idx] else ""
+            raw_score = str(row[score_idx]).strip() if row[score_idx] else ""
+
+            if raw_item:
+                item = raw_item
+                last_item = item
+            else:
+                item = last_item
+
+            score = None
+            if raw_score:
+                m = re.search(r"(\d+(?:\.\d+)?)", raw_score)
+                if m:
+                    try:
+                        score = float(m.group(1))
+                        if 0 <= score <= 100:
+                            has_valid_score = True
+                        else:
+                            score = None
+                    except ValueError:
+                        pass
+            if score is None and last_score is not None:
+                score = last_score
+            else:
+                last_score = score
+
+            if score is None:
+                continue
+
+            criteria = ""
+            if criteria_idx >= 0 and criteria_idx < len(row) and row[criteria_idx]:
+                criteria = str(row[criteria_idx]).strip().replace("\n", " ")
+
+            if not item:
+                continue
+
+            # 跳过表头行
+            skip_headers = {"评分内容", "评分要素", "评分因素", "评审内容", "评分项目",
+                           "分值", "得分", "分数", "评分", "权重", "权值", "权",
+                           "评分标准", "评审标准", "评分细则", "评分依据", "评审依据",
+                           "序号", "序", "序号序号", "自评分值", "满分"}
+            if item in skip_headers or re.match(r"^\d+$", item):
+                continue
+
+            # v2.5: 跳过合计行
+            if "合计" in item or "总计" in item or "小计" in item:
+                continue
+
+            # v2.5c: 逐item验证 - 去除空格后再匹配评分词和区块名
+            item_nospace = item.replace(" ", "")
+            has_item_desc = any(w in item_nospace for w in SCORING_DESC_WORDS)
+            has_item_section = any(s in item_nospace for s in SCORING_SECTION_NAMES)
+            if not has_item_desc and not has_item_section:
+                continue
+
+            table_items.append({
+                "category": "",
+                "item": item,
+                "score": score,
+                "criteria": criteria[:300],
+            })
+
+        if not has_valid_score:
+            continue
+
+        if not table_items:
+            continue
+
+        # v2.5c: 表级别验证 - 去除空格后匹配
+        table_has_desc = any(
+            any(w in ti["item"].replace(" ", "") for w in SCORING_DESC_WORDS)
+            or any(s in ti["item"].replace(" ", "") for s in SCORING_SECTION_NAMES)
+            for ti in table_items
+        )
+        if not table_has_desc:
+            continue
+
+        items.extend(table_items)
+
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for it in items:
+        key = it["item"]
+        if key not in seen:
+            seen.add(key)
+            unique.append(it)
+
+    return unique
+
+
+def extract_scoring_items(text: str, tables: list[dict] | None = None) -> list[dict]:
+    """从招标文件文本中提取评分项（技术分/商务分/价格分）。
+
+    优先从结构化表格中提取，如果没有结果再fallback到文本正则提取。
+    识别Markdown表格中的评分项/分值/评审标准，也支持纯文本格式。
+    返回：[{category, item, score, criteria}, ...]
+    """
+    items: list[dict] = []
+
+    # 优先从结构化表格中提取评分项
+    if tables:
+        table_items = extract_scoring_items_from_tables(tables)
+        if table_items:
+            return table_items
+
+    # 评分类别关键词
+    category_keywords: dict[str, list[str]] = {
+        '技术分': ['技术', '技术方案', '技术部分', '技术评分', '技术标'],
+        '商务分': ['商务', '商务部分', '商务评分', '商务方案', '商务标'],
+        '价格分': ['价格', '报价', '价格部分', '报价部分', '价格评分'],
+        '资信分': ['资信', '资信部分', '资信评分', '业绩', '业绩部分'],
+    }
+
+    def _guess_category(context: str) -> str:
+        for cat, keywords in category_keywords.items():
+            if any(kw in context for kw in keywords):
+                return cat
+        return ''
+
+    # ── 模式1: Markdown表格行 | 评分内容 | 分值 | 评审标准 | ──
+    md_row_pattern = re.compile(
+        r'\|\s*([^|]+?)\s*\|\s*(\d{1,2})\s*分?\s*\|\s*([^|]*)\s*\|'
+    )
+    # 表头关键词（跳过）
+    header_keywords = {'评分内容', '评分项', '评审项目', '项目', '分值', '评分标准', '评审标准'}
+    # v2.1: 文件清单排除词 + 评分描述词
+    filelist_exclude = {'附件', '备注', '目录', '格式自拟', '格式见', '投标人须知', '投标文件格式'}
+    scoring_desc_words = {'分', '得分', '满分', '扣', '加分', '减分', '评分', '权重'}
+
+    for line in text.split('\n'):
+        line = line.strip()
+        if not line or not line.startswith('|'):
+            continue
+        # 跳过表头分隔行 |---|---|---|
+        if re.match(r'^\|[\s\-:|]+\|$', line):
+            continue
+
+        m = md_row_pattern.match(line)
+        if not m:
+            continue
+
+        item_name = m.group(1).strip()
+        score_str = m.group(2).strip()
+        criteria = m.group(3).strip()
+
+        # 跳过表头
+        if item_name in header_keywords or score_str == '分值':
+            continue
+
+        # v2.1: 排除文件清单项
+        combined = item_name + ' ' + criteria
+        if any(ex in combined for ex in filelist_exclude):
+            continue
+        # v2.1: 要求评分描述词
+        if not any(w in combined for w in scoring_desc_words):
+            continue
+
+        try:
+            score = int(score_str)
+        except ValueError:
+            continue
+        if score == 0 or score > 100:
+            continue
+
+        category = _guess_category(line + ' ' + item_name)
+        items.append({
+            'category': category,
+            'item': item_name,
+            'score': score,
+            'criteria': criteria[:200],
+        })
+
+    # ── 模式2: 纯文本 "XX 分" 独立行 + 上下文回溯 ──
+    if not items:
+        lines = text.split('\n')
+        current_category = ''
+        scoring_section_names = [
+            '报价部分', '管理方案', '质控方案', '培训方案', '项目实施团队',
+            '应急预案', '服务承诺', '合理化建议', '综合能力', '权益保障',
+            '类似项目业绩', '技术方案', '商务部分', '资信部分', '价格部分',
+            '业绩部分', '团队部分', '服务方案', '实施方案', '售后方案',
+            '技术分', '商务分', '价格分', '资信分',
+        ]
+
+        for i, line in enumerate(lines):
+            line_s = line.strip()
+            if not line_s:
+                continue
+
+            # 检测类别行
+            for cat, keywords in category_keywords.items():
+                if any(kw == line_s or kw + '分' in line_s for kw in keywords):
+                    current_category = cat
+                    break
+
+            # 匹配 "15 分" / "10分" 独立行
+            score_match = re.match(r'^(\d{1,2})\s*分$', line_s)
+            if not score_match:
+                continue
+            score_val = int(score_match.group(1))
+            if score_val == 0 or score_val > 100:
+                continue
+
+            # 向上找评分项名称
+            item_name = ''
+            for j in range(i - 1, max(i - 6, -1), -1):
+                prev = lines[j].strip()
+                if not prev:
+                    continue
+                if re.match(r'^\d{1,2}\s*分$', prev):
+                    continue
+                if prev in header_keywords:
+                    continue
+                if '招标编号' in prev or ('第' in prev and '页' in prev):
+                    continue
+                if re.match(r'^-\s*\d+\s*-$', prev):
+                    continue
+                is_known = any(name in prev for name in scoring_section_names)
+                is_title = len(prev) <= 20 and '。' not in prev and '，' not in prev
+                if is_known or is_title:
+                    item_name = prev
+                    break
+
+            # 向下找评审标准描述
+            criteria_lines: list[str] = []
+            for k in range(i + 1, min(i + 8, len(lines))):
+                nxt = lines[k].strip()
+                if not nxt:
+                    continue
+                if re.match(r'^\d{1,2}\s*分$', nxt):
+                    break
+                if nxt in header_keywords:
+                    break
+                if '招标编号' in nxt or re.match(r'^-\s*\d+\s*-$', nxt):
+                    continue
+                if any(name == nxt for name in scoring_section_names):
+                    break
+                criteria_lines.append(nxt)
+
+            if item_name:
+                # v2.1: 排除文件清单项 + 评分描述词验证
+                combined2 = item_name + ' ' + ' '.join(criteria_lines)
+                if any(ex in combined2 for ex in filelist_exclude):
+                    continue
+                if not any(w in combined2 for w in scoring_desc_words):
+                    scoring_section_names2 = [
+                        '技术', '商务', '价格', '资信', '业绩', '方案', '服务',
+                        '响应', '报价', '资质', '证书', '人员', '团队'
+                    ]
+                    if not any(s in combined2 for s in scoring_section_names2):
+                        continue
+                cat = current_category or _guess_category(item_name)
+                items.append({
+                    'category': cat,
+                    'item': item_name,
+                    'score': score_val,
+                    'criteria': ' '.join(criteria_lines)[:200],
+                })
+
+    # 去重（同名的保留第一个）
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for item in items:
+        key = item['item']
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+
+    return unique
+
+
+def extract_disqualification_clauses(text: str) -> list[dict]:
+    """提取废标条款（废标/无效投标/否决投标/投标无效章节）。
+
+    返回：[{clause, source_section}, ...]
+    """
+    clauses: list[dict] = []
+
+    # 废标相关章节标题模式
+    section_patterns = [
+        r'(废标条款)',
+        r'(无效投标)',
+        r'(投标无效)',
+        r'(否决投标)',
+        r'(废标情形)',
+        r'(无效投标情形)',
+        r'(否决投标文件)',
+        r'(废标条件)',
+    ]
+
+    # 废标触发关键词（用于全文扫描补充）
+    trigger_keywords = [
+        '废标', '无效投标', '否决投标', '投标无效',
+        '作废标', '予以否决', '将被否决', '投标文件将否决',
+    ]
+
+    lines = text.split('\n')
+
+    # ── 步骤1: 定位废标章节并提取编号条款 ──
+    section_starts: list[tuple[int, str]] = []
+    for i, line in enumerate(lines):
+        line_s = line.strip()
+        for sp in section_patterns:
+            m = re.search(sp, line_s)
+            if m and len(line_s) < 30:
+                section_starts.append((i, m.group(1)))
+                break
+
+    if section_starts:
+        for sec_idx, (start, sec_name) in enumerate(section_starts):
+            # 确定章节结束位置
+            end = len(lines)
+            if sec_idx + 1 < len(section_starts):
+                end = section_starts[sec_idx + 1][0]
+            else:
+                for j in range(start + 1, min(start + 200, len(lines))):
+                    if re.match(r'^[一二三四五六七八九十]+[、.．]\s', lines[j].strip()) \
+                            and len(lines[j].strip()) < 30:
+                        end = j
+                        break
+
+            # 从章节内提取编号条款
+            for j in range(start + 1, end):
+                line_s = lines[j].strip()
+                if not line_s:
+                    continue
+                if '招标编号' in line_s or re.match(r'^-\s*\d+\s*-$', line_s):
+                    continue
+                if '第' in line_s and '页' in line_s:
+                    continue
+
+                is_numbered = (
+                    re.match(r'^[（(]?\d+[)）.、．]\s', line_s)
+                    or re.match(r'^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]', line_s)
+                )
+                if not is_numbered:
+                    continue
+
+                clause = re.sub(r'^[（(]?\d+[)）.、．]\s*', '', line_s).strip()
+                clause = re.sub(r'^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]\s*', '', clause).strip()
+
+                # 合并续行
+                for k in range(j + 1, min(j + 5, end)):
+                    nxt = lines[k].strip()
+                    if not nxt:
+                        break
+                    if re.match(r'^[（(]?\d+[)）.、．]\s', nxt) \
+                            or re.match(r'^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]', nxt):
+                        break
+                    clause = clause + ' ' + nxt
+
+                clause = re.sub(r'\s+', ' ', clause).strip()
+                clause = re.sub(r'第\d+页|招标编号.*?$', '', clause).strip()
+                if clause and len(clause) > 5:
+                    clauses.append({
+                        'clause': clause,
+                        'source_section': sec_name,
+                    })
+
+    # ── 步骤2: 全文扫描含废标关键词的句子（补充/兜底） ──
+    if not clauses:
+        for i, line in enumerate(lines):
+            line_s = line.strip()
+            if not line_s or len(line_s) < 10:
+                continue
+            if any(kw in line_s for kw in trigger_keywords):
+                # 向上回溯找完整句子
+                merged = line_s
+                for j in range(i - 1, max(i - 5, -1), -1):
+                    prev = lines[j].strip()
+                    if not prev:
+                        break
+                    if prev.endswith(('。', '；', ';')) or re.match(r'^\d+[.、]', prev):
+                        merged = prev + ' ' + merged
+                        break
+                    merged = prev + ' ' + merged
+
+                merged = re.sub(r'\s+', ' ', merged).strip()
+                merged = re.sub(r'第\d+页|招标编号.*?$', '', merged).strip()
+
+                if merged and len(merged) > 10:
+                    source = ''
+                    for sp in section_patterns:
+                        m = re.search(sp, merged)
+                        if m:
+                            source = m.group(1)
+                            break
+                    if not source:
+                        source = '全文扫描'
+                    clauses.append({
+                        'clause': merged,
+                        'source_section': source,
+                    })
+
+    # 去重
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for c in clauses:
+        key = c['clause'][:50]
+        if key not in seen:
+            seen.add(key)
+            unique.append(c)
+
+    return unique
+
+
+def extract_qualification_requirements(text: str) -> list[dict]:
+    """提取资质要求（投标人资格要求章节）。
+
+    识别营业执照/资质证书/许可证/认证/业绩要求，返回结构化数据。
+    返回：[{requirement, type, certificate}, ...]
+    """
+    requirements: list[dict] = []
+
+    # 证书/资质关键词映射
+    cert_keywords: dict[str, list[str]] = {
+        '营业执照': ['营业执照', '工商营业执照', '统一社会信用代码'],
+        '资质证书': ['资质证书', '资质等级', '资质证明', '建筑业企业资质', '工程资质'],
+        '许可证': ['许可证', '经营许可证', '安全生产许可证', '食品经营许可证', '卫生许可证'],
+        '认证': ['认证', 'ISO', '质量管理体系认证', '环境管理体系认证',
+                 '职业健康安全管理体系认证', '3C认证', 'CCC认证'],
+        '业绩要求': ['业绩', '类似项目', '同类项目', '项目业绩', '合同业绩'],
+    }
+
+    # 必备/可选判定关键词
+    required_keywords = ['必须', '应当', '须具备', '应具备', '须具有', '应具有',
+                         '须提供', '应提供', '必备']
+    optional_keywords = ['可选', '加分', '优先', '宜具备', '宜具有']
+
+    lines = text.split('\n')
+
+    # 定位资格要求章节
+    in_section = False
+
+    for i, line in enumerate(lines):
+        line_s = line.strip()
+        if not line_s:
+            continue
+
+        if not in_section:
+            if re.search(r'(?:投标[人商]?资格[条件要求]?|资格条件|资质要求)',
+                         line_s) and len(line_s) < 30:
+                in_section = True
+                continue
+        else:
+            # 遇到下一个大章节标题就停
+            if re.match(r'^[一二三四五六七八九十]+[、.．]\s', line_s) \
+                    and len(line_s) < 30:
+                break
+            if '招标编号' in line_s or re.match(r'^-\s*\d+\s*-$', line_s):
+                continue
+            if '第' in line_s and '页' in line_s:
+                continue
+
+            is_numbered = (
+                re.match(r'^[（(]\d+[)）]', line_s)
+                or re.match(r'^\d+\s*[、.．]\s', line_s)
+                or re.match(r'^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]', line_s)
+            )
+            if not is_numbered:
+                continue
+
+            clause = re.sub(r'^[（(]\d+[)）]\s*', '', line_s).strip()
+            clause = re.sub(r'^\d+\s*[、.．]\s*', '', clause).strip()
+            clause = re.sub(r'^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]\s*', '', clause).strip()
+
+            # 合并续行
+            for k in range(i + 1, min(i + 5, len(lines))):
+                nxt = lines[k].strip()
+                if not nxt:
+                    break
+                if re.match(r'^[（(]\d+[)）]', nxt) \
+                        or re.match(r'^\d+\s*[、.．]\s', nxt) \
+                        or re.match(r'^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]', nxt):
+                    break
+                if re.match(r'^[一二三四五六七八九十]+[、.．]\s', nxt):
+                    break
+                if '招标编号' in nxt or re.match(r'^-\s*\d+\s*-$', nxt):
+                    break
+                clause = clause + ' ' + nxt
+
+            clause = re.sub(r'\s+', ' ', clause).strip()
+            if not clause or len(clause) <= 5:
+                continue
+
+            # 判定必备/可选
+            req_type = '必备'
+            if any(kw in clause for kw in optional_keywords):
+                req_type = '可选'
+            elif any(kw in clause for kw in required_keywords):
+                req_type = '必备'
+
+            # 识别所需证书
+            certs: list[str] = []
+            for cert_type, keywords in cert_keywords.items():
+                if any(kw in clause for kw in keywords):
+                    certs.append(cert_type)
+
+            requirements.append({
+                'requirement': clause,
+                'type': req_type,
+                'certificate': '、'.join(certs) if certs else '',
+            })
+
+    # 兜底：从全文扫描含证书关键词的句子
+    if not requirements:
+        for line in lines:
+            line_s = line.strip()
+            if not line_s or len(line_s) < 10:
+                continue
+            matched_certs: list[str] = []
+            for cert_type, keywords in cert_keywords.items():
+                if any(kw in line_s for kw in keywords):
+                    matched_certs.append(cert_type)
+            if matched_certs and ('须' in line_s or '应' in line_s
+                                  or '必须' in line_s or '具备' in line_s):
+                req_type = '必备'
+                if any(kw in line_s for kw in optional_keywords):
+                    req_type = '可选'
+                requirements.append({
+                    'requirement': line_s,
+                    'type': req_type,
+                    'certificate': '、'.join(matched_certs),
+                })
+
+    # 去重
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for r in requirements:
+        key = r['requirement'][:50]
+        if key not in seen:
+            seen.add(key)
+            unique.append(r)
+
+    return unique
+
+
 def parse_bid_document(file_path):
     """主函数：拆解招标文件"""
     print(f"正在读取：{file_path}", file=sys.stderr)
@@ -694,6 +1435,9 @@ def parse_bid_document(file_path):
         "时间节点": extract_timeline(text),
         "资质要求": extract_qualifications(text),
         "保证金": extract_deposit(text),
+        "scoring_items": extract_scoring_items(text, tables),
+        "disqualification_clauses": extract_disqualification_clauses(text),
+        "qualification_requirements": extract_qualification_requirements(text),
         "_表格数据": tables,
     }
     
@@ -705,6 +1449,9 @@ def parse_bid_document(file_path):
         "大纲标题_格式": len(result["大纲框架"]["来源_格式"]),
         "评分项": len(result["大纲框架"]["来源_评分项"]),
         "资质要求": len(result["资质要求"]),
+        "评分项_结构化": len(result["scoring_items"]),
+        "废标条款_结构化": len(result["disqualification_clauses"]),
+        "资质要求_结构化": len(result["qualification_requirements"]),
         "表格数": len(tables),
     }
     result["_统计"] = stats
