@@ -128,8 +128,38 @@ def add_heading(doc, text, level):
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     return p
 
+def strip_md_residue(text):
+    """去除Markdown残留语法标记，保留纯文本内容。
+    
+    处理顺序（从长到短避免冲突）：
+    1. 图片 ![alt](url) → [图片: alt]
+    2. 链接 [text](url) → text（url）
+    3. 删除线 ~~text~~ → text
+    4. 粗体 **text** → text
+    5. 斜体 *text* → text（在**之后处理，不会误伤**）
+    6. 行内代码 `text` → text
+    7. 行首 > 引用 → 去掉前缀
+    """
+    # 图片（最优先，避免被链接规则吞掉）
+    text = re.sub(r'!\[([^\]]*)\]\(([^)]*)\)', r'[图片: \1]', text)
+    # 链接 [text](url) → text（url）
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1（\2）', text)
+    # 删除线 ~~text~~
+    text = re.sub(r'~~(.+?)~~', r'\1', text)
+    # 粗体 **text**
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    # 斜体 *text*（必须在**之后处理）
+    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', text)
+    # 行内代码 `text`
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+    # 行首引用 >
+    text = re.sub(r'^>\s?', '', text, flags=re.MULTILINE)
+    return text
+
 def add_body(doc, text):
     """添加正文：宋体小四，1.5倍行距，首行缩进2字符(480twips)，两端对齐"""
+    # 去除Markdown残留标记
+    text = strip_md_residue(text)
     p = doc.add_paragraph(text, style='Normal')
     for run in p.runs:
         set_run_song(run, 12, False)
@@ -251,6 +281,9 @@ def md_to_docx(md_text, output_path, auto_fix=True):
     """Markdown 文本 -> 标准格式 Word 文档"""
     doc = Document()
     init_doc_styles(doc)
+
+    # 🧹 先去除Markdown残留标记（在全角半角修复之前，避免括号被转义）
+    md_text = strip_md_residue(md_text)
 
     # 🔧 全角半角自动修复（负责人点名的大痛点）
     if auto_fix:

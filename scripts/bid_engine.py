@@ -525,7 +525,27 @@ def check_heading_styles(doc):
     
     return issues
 
+def strip_md_residue(text):
+    """去除Markdown残留语法标记，保留纯文本内容。"""
+    # 图片
+    text = re.sub(r'!\[([^\]]*)\]\(([^)]*)\)', r'[图片: \1]', text)
+    # 链接
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1（\2）', text)
+    # 删除线
+    text = re.sub(r'~~(.+?)~~', r'\1', text)
+    # 粗体
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    # 斜体（必须在**之后处理）
+    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'\1', text)
+    # 行内代码
+    text = re.sub(r'`([^`]+)`', r'\1', text)
+    # 行首引用
+    text = re.sub(r'^>\s?', '', text, flags=re.MULTILINE)
+    return text
+
 def add_body(doc, text, body_spec):
+    # 去除Markdown残留标记
+    text = strip_md_residue(text)
     p = doc.add_paragraph(text, style='Normal')
     for run in p.runs: set_run_font(run, body_spec['font'], body_spec['size'], body_spec['bold'])
     p.paragraph_format.first_line_indent = Twips(480)
