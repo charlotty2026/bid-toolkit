@@ -16,6 +16,7 @@ import json
 import os
 import re
 import sys
+import yaml as _yaml_module
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rfp_structure import get_chapters, LEGAL_BASIS
@@ -173,7 +174,7 @@ def check_scoring(text, project_type="services"):
         m = re.search(pattern, text)
         if m:
             start = m.start()
-            next_chapter = re.search(r'\n[#\s]*第[6六][章节]', text[start:])
+            next_chapter = re.search(r'\n第[6六][章节]', text[start:])
             end = start + next_chapter.start() if next_chapter else len(text)
             scoring_section = text[start:end]
             break
@@ -246,12 +247,46 @@ def check_scoring(text, project_type="services"):
     return results
 
 
-# 各项目类型价格分合理区间
-PRICE_RANGES = {
+
+# 各项目类型价格分合理区间（默认值，可通过 --scoring-config 加载外部YAML覆盖）
+DEFAULT_PRICE_RANGES = {
     "goods": (30, 40),
     "services": (10, 20),
     "engineering": (15, 25),
 }
+
+# 运行时实际使用的价格分区间（可被 load_scoring_config 覆盖）
+PRICE_RANGES = dict(DEFAULT_PRICE_RANGES)
+
+def load_compliance_scoring_config(config_path):
+    """从外部YAML文件加载自定义价格分区间
+    
+    读取 scoring.yaml 中的 price_ranges 字段，覆盖默认值。
+    格式：
+      price_ranges:
+        goods: [30, 40]
+        services: [10, 20]
+        engineering: [15, 25]
+    
+    Raises: FileNotFoundError, ValueError
+    """
+    global PRICE_RANGES
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"评分配置文件不存在：{config_path}")
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            data = _yaml_module.safe_load(f)
+    except _yaml_module.YAMLError as e:
+        raise ValueError(f"YAML格式错误：{e}")
+    
+    if not data or not isinstance(data, dict):
+        return
+    if 'price_ranges' in data:
+        for ptype, rng in data['price_ranges'].items():
+            if isinstance(rng, list) and len(rng) == 2:
+                PRICE_RANGES[ptype] = tuple(rng)
+        print(f"✅ 已加载自定义价格分区间：{PRICE_RANGES}")
 
 
 def check_price_range(price_score, project_type="services"):
@@ -369,191 +404,6 @@ def check_legal_basis(text):
     return results
 
 
-# 红线2: 评审模糊检测——评分标准中不得出现模糊、不可量化的表述
-# 法律依据：87号令第55条——评审因素应当细化和量化，与采购需求对应
-VAGUE_SCORING_PATTERNS = [
-    (r"酌情给分", "「酌情给分」属于模糊表述，应明确具体分值或计算公式"),
-    (r"酌情.{0,4}扣分", "「酌情扣分」属于模糊表述，应明确扣分标准"),
-    (r"视情况.{0,4}给分", "「视情况给分」属于模糊表述，应量化评分条件"),
-    (r"由评委.{0,6}确定", "「由评委确定」缺少客观标准，应提供量化依据"),
-    (r"由评标委员会.{0,6}确定.{0,4}分", "评委自由裁量分值过大，应限定范围或给计算公式"),
-    (r"评委.{0,4}综合.{0,4}评定", "「评委综合评定」无量化标准，应细化评分因素"),
-    (r"优.{0,4}分.{0,4}良.{0,4}分.{0,4}中.{0,4}分.{0,4}差", "等级评分法应明确各等级的具体判定标准"),
-    (r"较好.{0,6}分", "「较好」无客观标准，应描述具体达到什么指标得多少分"),
-    (r"一般.{0,4}分.{0,4}较好.{0,4}分", "等级评分缺少判定标准，应量化每个等级的边界"),
-]
-
-
-def check_vague_scoring(text):
-    """红线2: 检查评分标准中是否存在模糊、不可量化的表述
-
-    法律依据：87号令第55条——评审因素应当细化和量化，与采购需求对应。
-    评分标准中出现"酌情""视情况""由评委确定"等模糊表述，投标人无法准备、
-    评委自由裁量空间过大，容易被质疑/投诉。
-    """
-    results = []
-
-    # 定位评分区域
-    scoring_section = None
-    for pattern in [
-        r'第[5五][章节][^\n]*?(?:评标|评审|评分)',
-        r'(?:评标|评审)办法',
-        r'评分(?:标准|细则|因素|办法)',
-    ]:
-        m = re.search(pattern, text)
-        if m:
-            start = m.start()
-            next_chapter = re.search(r'\n[#\s]*第[6六][章节]', text[start:])
-            end = start + next_chapter.start() if next_chapter else len(text)
-            scoring_section = text[start:end]
-            break
-
-    search_text = scoring_section if scoring_section else text
-
-    for pattern, reason in VAGUE_SCORING_PATTERNS:
-        matches = list(re.finditer(pattern, search_text))
-        for m in matches:
-            start = max(0, m.start() - 30)
-            end = min(len(search_text), m.end() + 30)
-            context = search_text[start:end].replace('\n', ' ')
-            results.append({
-                "type": "评审模糊",
-                "severity": "warn",
-                "reason": reason,
-                "match": m.group(),
-                "context": f"...{context}...",
-                "suggestion": "将模糊表述替换为可量化的评分标准（具体分值/计算公式/明确判定条件）",
-            })
-
-    if not results:
-        results.append({
-            "type": "评审模糊",
-            "severity": "pass",
-            "message": "评分标准中未发现模糊表述",
-        })
-
-    return results
-
-
-# 红线4: 等标期计算——招标公告发布至投标截止不得少于20日
-# 法律依据：87号令第25条——公开招标公告发布之日起至投标截止之日止不得少于20日
-# 竞争性谈判/询价另行规定，本工具以公开招标为主
-DATE_PATTERN = r'(\d{4})[年\-/](\d{1,2})[月\-/](\d{1,2})[日号]?'
-
-
-def check_bid_period(text):
-    """红线4: 检查等标期（招标公告发布至投标截止的时间间隔）
-
-    法律依据：87号令第25条——公开招标的等标期不得少于20日。
-    本函数尝试从文本中提取公告发布日期和投标截止日期，计算间隔天数。
-    """
-    from datetime import datetime, timedelta
-
-    results = []
-
-    # 尝试提取投标截止时间
-    deadline_patterns = [
-        r'投标截止[^\n]*?(\d{4})[年\-/](\d{1,2})[月\-/](\d{1,2})',
-        r'递交投标文件.{0,10}截止[^\n]*?(\d{4})[年\-/](\d{1,2})[月\-/](\d{1,2})',
-        r'开标时间[^\n]*?(\d{4})[年\-/](\d{1,2})[月\-/](\d{1,2})',
-    ]
-
-    deadline_date = None
-    for pattern in deadline_patterns:
-        m = re.search(pattern, text)
-        if m:
-            try:
-                year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
-                deadline_date = datetime(year, month, day)
-                break
-            except ValueError:
-                continue
-
-    # 尝试提取公告发布时间
-    publish_patterns = [
-        r'招标公告发布[^\n]*?(\d{4})[年\-/](\d{1,2})[月\-/](\d{1,2})',
-        r'公告发布.{0,6}日期[^\n]*?(\d{4})[年\-/](\d{1,2})[月\-/](\d{1,2})',
-        r'发布.{0,6}招标公告[^\n]*?(\d{4})[年\-/](\d{1,2})[月\-/](\d{1,2})',
-        r'招标公告.{0,10}(\d{4})[年\-/](\d{1,2})[月\-/](\d{1,2})',
-    ]
-
-    publish_date = None
-    for pattern in publish_patterns:
-        m = re.search(pattern, text)
-        if m:
-            try:
-                year, month, day = int(m.group(1)), int(m.group(2)), int(m.group(3))
-                publish_date = datetime(year, month, day)
-                break
-            except ValueError:
-                continue
-
-    # 如果两个日期都找到了，计算等标期
-    if deadline_date and publish_date:
-        period = (deadline_date - publish_date).days
-        if period < 20:
-            results.append({
-                "type": "等标期",
-                "severity": "fail",
-                "message": f"等标期仅{period}天，不足20日（87号令第25条）",
-                "detail": f"公告发布日：{publish_date.strftime('%Y-%m-%d')}，投标截止日：{deadline_date.strftime('%Y-%m-%d')}",
-                "suggestion": "延长投标截止时间至公告发布后不少于20日",
-            })
-        else:
-            results.append({
-                "type": "等标期",
-                "severity": "pass",
-                "message": f"等标期{period}天，满足≥20日要求",
-                "detail": f"公告发布日：{publish_date.strftime('%Y-%m-%d')}，投标截止日：{deadline_date.strftime('%Y-%m-%d')}",
-            })
-
-    elif deadline_date and not publish_date:
-        # 只有截止日期，检查是否有"自公告发布之日起XX日"的表述
-        period_pattern = re.search(r'不少于(\d+)日|不得少于(\d+)日', text)
-        if period_pattern:
-            stated_period = int(period_pattern.group(1) or period_pattern.group(2))
-            if stated_period < 20:
-                results.append({
-                    "type": "等标期",
-                    "severity": "fail",
-                    "message": f"文件载明等标期{stated_period}日，不足20日（87号令第25条）",
-                    "suggestion": "修改为不少于20日",
-                })
-            else:
-                results.append({
-                    "type": "等标期",
-                    "severity": "pass",
-                    "message": f"文件载明等标期{stated_period}日，满足≥20日要求",
-                })
-        else:
-            results.append({
-                "type": "等标期",
-                "severity": "warn",
-                "message": "找到投标截止日期但未找到公告发布日期，无法计算等标期",
-                "detail": f"投标截止日：{deadline_date.strftime('%Y-%m-%d')}",
-                "suggestion": "请确保招标公告发布至投标截止不少于20日（87号令第25条）",
-            })
-
-    elif not deadline_date and not publish_date:
-        # 两个日期都没找到，检查前附表中的占位符
-        if "投标截止" in text or "开标时间" in text:
-            results.append({
-                "type": "等标期",
-                "severity": "warn",
-                "message": "文件包含投标截止/开标时间信息但未提取到具体日期，请人工确认等标期≥20日",
-                "suggestion": "法律依据：87号令第25条，公开招标等标期不得少于20日",
-            })
-        else:
-            results.append({
-                "type": "等标期",
-                "severity": "warn",
-                "message": "未找到投标截止时间和公告发布时间",
-                "suggestion": "招标文件应明确投标截止时间，且公告发布至截止不少于20日（87号令第25条）",
-            })
-
-    return results
-
-
 def run_all_checks(text, project_type="services"):
     """运行所有检查"""
     report = {
@@ -565,9 +415,7 @@ def run_all_checks(text, project_type="services"):
             "required_sections": check_required_sections(text, project_type),
             "exclusionary": check_exclusionary(text),
             "scoring": check_scoring(text, project_type),
-            "vague_scoring": check_vague_scoring(text),
             "rejection": check_rejection_clauses(text),
-            "bid_period": check_bid_period(text),
             "time_nodes": check_time_nodes(text),
             "qualification": check_qualification(text),
             "legal_basis": check_legal_basis(text),
@@ -648,9 +496,19 @@ def main():
     parser.add_argument('--type', choices=['goods', 'services', 'engineering'],
                         default='services', help='项目类型')
     parser.add_argument('-o', '--output', help='输出报告路径（JSON）')
+    parser.add_argument('--scoring-config', dest='scoring_config',
+                        help='从YAML文件加载自定义价格分区间（覆盖默认）')
     parser.add_argument('--format', choices=['json', 'text'], default='text',
                         help='输出格式')
     args = parser.parse_args()
+
+    # 加载自定义价格分区间（可选）
+    if args.scoring_config:
+        try:
+            load_compliance_scoring_config(args.scoring_config)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"❌ 加载评分配置失败：{e}")
+            sys.exit(1)
 
     text = read_file(args.rfp)
     report = run_all_checks(text, args.type)

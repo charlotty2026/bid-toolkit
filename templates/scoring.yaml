@@ -1,0 +1,62 @@
+# 评分标准模板 v1.0
+# 企业可自定义评分维度、分值和细则
+# 传给 rfp_generator.py --scoring-config 即可覆盖默认模板
+
+# === 默认评分模板（按项目类型）===
+default:
+  goods:
+    - name: 价格分
+      score: 30
+      detail: 最低有效报价得满分，其他按公式计算
+    - name: 技术分
+      score: 50
+      detail: 技术参数响应、方案质量、技术能力
+    - name: 商务分
+      score: 20
+      detail: 资质、业绩、信誉、售后服务
+  services:
+    - name: 价格分
+      score: 10
+      detail: 最低有效报价得满分，其他按公式计算
+    - name: 技术分
+      score: 60
+      detail: 服务方案、人员配置、管理制度、应急预案
+    - name: 商务分
+      score: 30
+      detail: 资质、业绩、信誉、本地化服务能力
+  engineering:
+    - name: 价格分
+      score: 20
+      detail: 最低有效报价得满分，其他按公式计算
+    - name: 技术分
+      score: 60
+      detail: 施工组织设计、施工方案、安全文明施工
+    - name: 商务分
+      score: 20
+      detail: 资质、业绩、信誉、项目管理人员
+
+# === 价格分合理区间（合规检查用）===
+price_ranges:
+  goods: [30, 40]
+  services: [10, 20]
+  engineering: [15, 25]
+
+# === 自定义示例 ===
+# 企业可以复制这个模板，修改维度/分值/细则，然后通过 --scoring-config 传入
+# custom_example:
+#   services:
+#     - name: 价格分
+#       score: 10
+#       detail: 最低有效报价得满分
+#     - name: 技术分
+#       score: 40
+#       detail: 服务方案20分+人员配置10分+管理制度10分
+#     - name: 商务分
+#       score: 20
+#       detail: 资质10分+业绩5分+信誉5分
+#     - name: 绿色采购
+#       score: 10
+#       detail: 节能产品认证5分+环境标志认证5分
+#     - name: 本地化服务
+#       score: 20
+#       detail: 本地分支机构10分+本地人员10分

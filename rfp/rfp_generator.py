@@ -26,86 +26,97 @@ from rfp_structure import (
     PROJECT_TYPES, STANDARD_CHAPTERS, ENGINEERING_EXTRA_CHAPTERS,
     LEGAL_BASIS, get_chapters,
 )
-from rfp_templates import (
-    generate_procurement_content,
-    generate_contract_content,
-    generate_bid_format_content,
-    generate_invitation_content,
-    generate_notice_content,
-    generate_qualification_content,
-    generate_evaluation_content,
-    generate_engineering_content,
-)
 
-# ===== 评分标准模板（分值汇总，用于JSON同步）=====
-SCORING_TEMPLATES = {
-    "goods": {"价格分": 30, "技术分": 50, "商务分": 20},
-    "services": {"价格分": 10, "技术分": 60, "商务分": 30},
-    "engineering": {"价格分": 20, "技术分": 60, "商务分": 20},
-}
+import yaml as _yaml_module
 
-# ===== 评分标准明细（四列拆分法：评分项/分值/得分条件/投标人需提供的材料）=====
-DETAILED_SCORING = {
-    "services": [
-        ("投标报价", 10, "满足招标文件要求的最低报价为基准价，按公式计算得分", "价格文件（投标报价表）"),
-        ("服务方案", 20, "方案完整、科学、可行，覆盖全部服务需求，缺项扣分", "服务方案说明书"),
-        ("人员配置", 15, "项目团队人员资质和数量满足要求，关键岗位持证上岗", "人员简历表、资格证书复印件"),
-        ("服务承诺", 10, "服务质量承诺明确，响应时间合理，有量化指标", "服务承诺书"),
-        ("应急预案", 10, "突发事件应对方案完整可操作，含分级响应机制", "应急预案文件"),
-        ("管理制度", 5, "内部管理制度健全（考勤/培训/考核/交接班）", "管理制度文件"),
-        ("企业业绩", 10, "近三年同类项目业绩，每个有效业绩得X分，最高10分", "业绩证明材料（合同复印件+验收报告）"),
-        ("企业资质", 10, "持有相关资质证书（如ISO9001/人力资源许可证等）", "资质证书复印件"),
-        ("财务状况", 5, "财务状况良好，近三年无亏损", "近三年财务报表"),
-        ("信用记录", 5, "无不良信用记录（信用中国查询无失信/违法记录）", "信用中国查询截图"),
-    ],
-    "goods": [
-        ("投标报价", 30, "满足招标文件要求且最低价为基准价，按公式计算", "价格文件（投标报价表）"),
-        ("技术参数响应", 25, "技术参数完全响应招标要求，带★项全部满足，一般项偏离逐项扣分", "技术规格响应/偏离表"),
-        ("产品质量", 15, "提供产品认证及第三方检测报告，认证齐全得满分", "产品检测报告、认证证书复印件"),
-        ("售后服务方案", 10, "保修期≥X年，故障响应≤X小时，有本地服务网点", "售后服务方案、网点证明材料"),
-        ("企业业绩", 8, "近三年同类货物供货业绩，每个有效业绩得X分", "业绩证明材料（合同复印件）"),
-        ("企业资质", 7, "营业执照经营范围相符，相关资质齐全", "营业执照、资质证书复印件"),
-        ("交货期承诺", 5, "交货期优于招标文件要求的得满分", "交货期承诺函"),
-    ],
-    "engineering": [
-        ("投标报价", 20, "满足招标文件要求且最低价为基准价，按公式计算", "价格文件（投标报价表）"),
-        ("施工组织方案", 20, "施工组织设计完整，技术方案科学可行，进度计划合理", "施工组织设计文件"),
-        ("项目经理", 15, "持有相应建造师证书，近三年主持过同类工程", "项目经理简历、资格证书、业绩证明"),
-        ("技术人员配置", 10, "技术团队专业齐全（施工/质量/安全），持证上岗", "人员简历表、资格证书"),
-        ("质量保证措施", 10, "质量管理体系健全，措施具体可行，有验收标准", "质量保证方案"),
-        ("安全文明施工", 5, "安全生产措施完善，文明施工方案到位", "安全施工方案"),
-        ("企业业绩", 8, "近三年同类工程业绩，每个有效业绩得X分", "业绩证明材料（合同复印件+验收报告）"),
-        ("企业资质", 7, "施工资质等级满足招标文件要求", "资质证书复印件"),
-        ("财务状况", 5, "财务状况良好，具备履约能力", "近三年财务报表"),
-    ],
-}
+# ===== 评分标准模板（默认值，可通过 --scoring-config 加载外部YAML覆盖）=====
+# 格式：{ 项目类型: [ {name, score, detail}, ... ] }
+# 总分必须=100，否则合规检查器会报错
 
-# ===== 废标条款分类清单（一票否决清单）=====
-# 三类：资格性废标 / 符合性废标 / 格式性废标
-REJECTION_CLAUSES = {
-    "一、资格性废标（资格条件不符）": [
-        "投标人不符合招标文件规定的资格条件的",
-        "投标人未按招标文件要求提供资格证明文件的",
-        "联合体投标未提交联合体协议或联合体成员不符合资格要求的",
-        "投标人处于禁止投标期内（被列入失信被执行人/重大税收违法/政府采购严重违法失信名单）",
-    ],
-    "二、符合性废标（实质性要求不符）": [
-        "投标报价超过最高投标限价的",
-        "投标报价低于成本且无法说明理由的",
-        "投标有效期不足的",
-        "投标文件存在重大偏差的（关键技术参数带★项不满足）",
-        "交货期/服务期/工期不满足招标文件要求的",
-        "存在串通投标行为的",
-        "提供虚假材料谋取中标的",
-    ],
-    "三、格式性废标（形式要求不符）": [
-        "投标文件未按招标文件要求密封的",
-        "投标文件未按要求签字和盖章的",
-        "未按要求提交投标保证金的（如要求）",
-        "投标文件未按招标文件规定的格式编制的",
-        "投标文件份数不符合招标文件要求的",
-    ],
-}
+def _validate_scoring(scoring_dict):
+    """校验评分模板合法性：必须是dict，每个类型的分值合计必须=100"""
+    if not isinstance(scoring_dict, dict):
+        raise ValueError(f"评分模板必须是字典格式，实际类型：{type(scoring_dict).__name__}")
+    for ptype, items in scoring_dict.items():
+        if not isinstance(items, list):
+            raise ValueError(f"评分模板 '{ptype}' 的值必须是列表，实际类型：{type(items).__name__}")
+        total = sum(item.get('score', 0) for item in items)
+        if total != 100:
+            raise ValueError(f"评分模板 '{ptype}' 总分={total}，必须等于100")
+
+def _load_default_scoring():
+    """从 templates/scoring.yaml 加载默认评分模板"""
+    scoring_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates', 'scoring.yaml')
+    if os.path.exists(scoring_path):
+        try:
+            with open(scoring_path, 'r', encoding='utf-8') as f:
+                data = _yaml_module.safe_load(f)
+            if data and 'default' in data:
+                _validate_scoring(data['default'])
+                return data['default']
+        except Exception as e:
+            print(f"⚠️ 加载默认评分模板失败（{e}），使用内置硬编码兜底")
+    # 兜底硬编码
+    return {
+        "goods": [
+            {"name": "价格分", "score": 30, "detail": "最低有效报价得满分，其他按公式计算"},
+            {"name": "技术分", "score": 50, "detail": "技术参数响应、方案质量、技术能力"},
+            {"name": "商务分", "score": 20, "detail": "资质、业绩、信誉、售后服务"},
+        ],
+        "services": [
+            {"name": "价格分", "score": 10, "detail": "最低有效报价得满分，其他按公式计算"},
+            {"name": "技术分", "score": 60, "detail": "服务方案、人员配置、管理制度、应急预案"},
+            {"name": "商务分", "score": 30, "detail": "资质、业绩、信誉、本地化服务能力"},
+        ],
+        "engineering": [
+            {"name": "价格分", "score": 20, "detail": "最低有效报价得满分，其他按公式计算"},
+            {"name": "技术分", "score": 60, "detail": "施工组织设计、施工方案、安全文明施工"},
+            {"name": "商务分", "score": 20, "detail": "资质、业绩、信誉、项目管理人员"},
+        ],
+    }
+
+SCORING_TEMPLATES = _load_default_scoring()
+
+def load_scoring_config(config_path):
+    """从外部YAML文件加载自定义评分模板
+    
+    YAML格式与 templates/scoring.yaml 相同。
+    支持两种写法：
+    1. 顶层直接是类型->列表（覆盖对应类型）
+    2. 用 default/custom_example 分组（取 default 或指定组名）
+    
+    Returns: dict，格式同 SCORING_TEMPLATES
+    
+    Raises: FileNotFoundError, ValueError
+    """
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"评分配置文件不存在：{config_path}")
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            data = _yaml_module.safe_load(f)
+    except _yaml_module.YAMLError as e:
+        raise ValueError(f"YAML格式错误：{e}")
+    
+    if not data:
+        raise ValueError(f"评分配置文件为空：{config_path}")
+    
+    if not isinstance(data, dict):
+        raise ValueError(f"评分配置必须是字典格式，实际类型：{type(data).__name__}")
+    
+    # 如果有 'default' 键，取 default 子字典
+    if 'default' in data:
+        result = data['default']
+    else:
+        # 否则直接用顶层（过滤掉非类型键如 price_ranges）
+        valid_types = {'goods', 'services', 'engineering'}
+        result = {k: v for k, v in data.items() if k in valid_types}
+    
+    if not result:
+        raise ValueError(f"评分配置中未找到有效的项目类型（goods/services/engineering）")
+    
+    _validate_scoring(result)
+    return result
 
 # P0 新节法律依据提示
 SECTION_HINTS = {
@@ -118,18 +129,18 @@ SECTION_HINTS = {
 def generate_front_sheet(project_info, project_type):
     """P0-2: 生成投标人须知前附表（自动填充已知信息）"""
     rows = [
-        ("1", "项目名称", str(project_info.get("project_name", "____"))),
-        ("2", "项目编号", str(project_info.get("project_id", "____"))),
-        ("3", "采购人", str(project_info.get("purchaser", "____"))),
-        ("4", "预算金额", f"{project_info.get('budget', '____')}元"),
+        ("1", "项目名称", str(project_info.get("project_name", "【待填写】"))),
+        ("2", "项目编号", str(project_info.get("project_id", "【待填写】"))),
+        ("3", "采购人", str(project_info.get("purchaser", "【待填写】"))),
+        ("4", "预算金额", f"{project_info.get('budget', '【待填写】')}元"),
         ("5", "项目类型", PROJECT_TYPES.get(project_type, "服务类")),
-        ("6", "投标截止时间", "____年____月____日 ____:____"),
-        ("7", "开标地点", "____（详见招标公告）"),
-        ("8", "投标有效期", "自投标截止日起90日历日"),
+        ("6", "投标截止时间", "【待填写：YYYY-MM-DD HH:MM】"),
+        ("7", "开标地点", "【待填写】"),
+        ("8", "投标有效期", "【待填写：自投标截止日起XX日】"),
         ("9", "投标保证金", "不超过预算金额的2%（87号令第33条）"),
-        ("10", "投标文件份数", "正本1份，副本4份"),
+        ("10", "投标文件份数", "正本1份，副本【待填写】份"),
         ("11", "评标方法", "综合评分法"),
-        ("12", "资金来源", str(project_info.get("fund_source", "财政资金"))),
+        ("12", "资金来源", str(project_info.get("fund_source", "【待填写】"))),
     ]
     lines = ["| 序号 | 条款名称 | 内容 |", "|------|---------|------|"]
     for row in rows:
@@ -164,18 +175,31 @@ def generate_gov_policy_content():
         lines.append(f"> 法律依据：{basis}\n")
     return "\n".join(lines)
 
-def generate_markdown(project_info, project_type="services"):
-    """生成Markdown格式招标文件"""
+def generate_markdown(project_info, project_type="services", scoring_override=None):
+    """生成Markdown格式招标文件
+    
+    Args:
+        project_info: 项目信息字典
+        project_type: 项目类型
+        scoring_override: 自定义评分模板，格式 {类型: [{name, score, detail}, ...]}
+                     传入则覆盖默认评分模板
+    """
     chapters = get_chapters(project_type)
     type_name = PROJECT_TYPES.get(project_type, "服务类")
-    scoring = SCORING_TEMPLATES.get(project_type, SCORING_TEMPLATES["services"])
+    
+    # 评分模板：优先用传入的 > 默认
+    if scoring_override and project_type in scoring_override:
+        scoring_items = scoring_override[project_type]
+    else:
+        scoring_items = SCORING_TEMPLATES.get(project_type, SCORING_TEMPLATES["services"])
 
     lines = []
     # 文件头
-    lines.append(f"# {project_info.get('project_name', '____')}招标文件\n")
-    lines.append(f"> 项目编号：{project_info.get('project_id', '____')}")
-    lines.append(f"> 采购人：{project_info.get('purchaser', '____')}")
-    lines.append(f"> 预算金额：{project_info.get('budget', '____')}元")
+    lines.append(f"# {project_info.get('project_name', '【项目名称】')}招标文件\n")
+    lines.append(f"> 项目类型：{type_name}")
+    lines.append(f"> 项目编号：{project_info.get('project_id', '【项目编号】')}")
+    lines.append(f"> 采购人：{project_info.get('purchaser', '【采购人】')}")
+    lines.append(f"> 预算金额：{project_info.get('budget', '【预算金额】')}元")
     lines.append(f"> 生成时间：{datetime.now().strftime('%Y-%m-%d')}\n")
     lines.append("---\n")
 
@@ -208,58 +232,11 @@ def generate_markdown(project_info, project_type="services"):
                 lines.append("")
                 continue
 
-            # P0-核心: 采购需求 -> 三类差异化模板
-            if ch["title"] == "采购需求":
-                lines.append(generate_procurement_content(project_info, project_type, section))
-                lines.append("")
-                continue
-
-            # P0-核心: 合同条款 -> 三类差异化模板
-            if ch["title"] == "合同条款":
-                lines.append(generate_contract_content(project_info, project_type, section))
-                lines.append("")
-                continue
-
-            # P0-核心: 投标文件格式 -> 三类差异化模板
-            if ch["title"] == "投标文件格式":
-                lines.append(generate_bid_format_content(project_info, project_type, section))
-                lines.append("")
-                continue
-
-            # P0-核心: 投标邀请 -> 通用模板
-            if ch["title"] == "投标邀请":
-                lines.append(generate_invitation_content(project_info, project_type, section))
-                lines.append("")
-                continue
-
-            # P0-核心: 投标人须知 -> 通用模板
-            if ch["title"] == "投标人须知":
-                lines.append(generate_notice_content(project_info, project_type, section))
-                lines.append("")
-                continue
-
-            # P0-核心: 资格审查 -> 通用模板
-            if ch["title"] == "资格审查":
-                lines.append(generate_qualification_content(project_info, project_type, section))
-                lines.append("")
-                continue
-
-            # P0-核心: 评标办法 -> 通用模板
-            if ch["title"] == "评标办法":
-                lines.append(generate_evaluation_content(project_info, project_type, section))
-                lines.append("")
-                continue
-
-            # P0-核心: 工程类专属章节 -> 通用模板
-            if project_type == "engineering" and ch["title"] in (
-                "技术条件（工程建设标准）", "工程图纸及勘察资料", "工程量清单", "最高投标限价"
-            ):
-                lines.append(generate_engineering_content(project_info, project_type, section))
-                lines.append("")
-                continue
-
-            # 兜底：无模板章节（不应到达此处）
-            lines.append(f"本节内容根据项目实际情况确定，投标人应按招标文件要求作出实质性响应。\n")
+            # 其他P0新节加法律依据提示
+            lines.append(f"【待填写：{section}具体内容】\n")
+            hint = SECTION_HINTS.get(section)
+            if hint:
+                lines.append(f"> {hint}\n")
 
         # 关键字段提示
         if ch.get("key_fields"):
@@ -268,153 +245,38 @@ def generate_markdown(project_info, project_type="services"):
                 lines.append(f"- [ ] {field}")
             lines.append("")
 
-    # 评分标准（四列拆分法）
+    # 评分标准
     lines.append("\n---\n")
-    lines.append("# 附件一：评分标准（综合评分法）\n")
+    lines.append("# 附件：评分标准（参考）\n")
     lines.append(f"> 项目类型：{type_name}，总分100分\n")
-    detailed = DETAILED_SCORING.get(project_type, DETAILED_SCORING["services"])
-    lines.append("| 序号 | 评分项 | 分值 | 得分条件 | 投标人需提供的材料 |")
-    lines.append("|------|--------|------|----------|-------------------|")
-    total = 0
-    for idx, (item, score, condition, material) in enumerate(detailed, 1):
-        lines.append(f"| {idx} | {item} | {score} | {condition} | {material} |")
-        total += score
-    lines.append(f"| — | **合计** | **{total}** | | |")
-    lines.append("")
-    lines.append("> ⚠️ 投标人应对照本表逐项准备材料，缺项可能导致该项零分。")
+    lines.append("| 评分因素 | 分值 | 评分细则 |")
+    lines.append("|---------|------|----------|")
+    for item in scoring_items:
+        name = item.get('name', '未知')
+        score = item.get('score', 0)
+        detail = item.get('detail', '【待填写评分细则】')
+        lines.append(f"| {name} | {score} | {detail} |")
+    lines.append(f"| **合计** | **{sum(item.get('score', 0) for item in scoring_items)}** | |")
 
-    # 废标条款（一票否决清单，分类列出）
+    # 废标条款
     lines.append("\n---\n")
-    lines.append("# 附件二：废标条款（⚠️ 一票否决清单 — 投标人必读）\n")
-    lines.append("出现以下任一情形的投标文件将被否决（废标），请投标人逐项自查：\n")
-    clause_num = 1
-    for category, items in REJECTION_CLAUSES.items():
-        lines.append(f"### {category}\n")
-        for item in items:
-            lines.append(f"{clause_num}. ⚠️ {item}")
-            clause_num += 1
-        lines.append("")
-    lines.append(f"> 法律依据：{LEGAL_BASIS['财政部87号令']['full_name']}第60条")
-    lines.append(f"> 投标人应在递交投标文件前逐项自查上述全部条款，任一不符即面临废标风险。")
+    lines.append("# 附件：废标条款（⚠️ 投标人必读）\n")
+    lines.append("以下情形之一的，按废标处理：\n")
+    standard_rejection = [
+        "投标文件未按招标文件要求密封的",
+        "投标文件未按要求签章的",
+        "投标报价超过最高投标限价的",
+        "投标有效期不足的",
+        "投标人未提交投标保证金的（如要求）",
+        "投标文件存在重大偏差的",
+        "投标人不符合资格要求的",
+        "存在串通投标行为的",
+    ]
+    for i, item in enumerate(standard_rejection, 1):
+        lines.append(f"{i}. ⚠️ {item}")
+    lines.append(f"\n> 法律依据：{LEGAL_BASIS['财政部87号令']['full_name']}第60条")
 
     return "\n".join(lines)
-
-
-def _convert_numbering(markdown_text, numbering="arabic"):
-    """转换Markdown中的编号列表项格式。
-
-    arabic:  1. 2. 3.       （默认，Word用List Number样式自动编号）
-    multi:   1.1 1.2 1.3     （多级编号，文本内嵌）
-    chinese: 一、 二、 三、   （中文编号，文本内嵌）
-    none:    去掉编号         （纯文本段落）
-    """
-    if numbering == "arabic":
-        return markdown_text
-
-    lines = markdown_text.split('\n')
-    result = []
-    list_counter = 0
-    chapter_num = 0
-    cn_nums = [
-        '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
-        '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八',
-        '十九', '二十', '二十一', '二十二', '二十三', '二十四', '二十五',
-        '二十六', '二十七', '二十八', '二十九', '三十',
-    ]
-
-    for line in lines:
-        stripped = line.strip()
-
-        # 追踪章节号（用于 multi 模式）
-        if stripped.startswith('# 第') and '章' in stripped:
-            chapter_num += 1
-            list_counter = 0
-            result.append(line)
-            continue
-
-        # 检测编号列表项（格式：数字. 文本）
-        is_numbered = (
-            bool(stripped)
-            and len(stripped) > 2
-            and stripped[0:2].rstrip('.').isdigit()
-            and '. ' in stripped[:5]
-        )
-
-        if is_numbered:
-            idx = stripped.index('. ')
-            content = stripped[idx + 2:]
-            list_counter += 1
-
-            if numbering == "multi":
-                result.append(f"{chapter_num}.{list_counter} {content}")
-            elif numbering == "chinese":
-                num = cn_nums[list_counter - 1] if list_counter <= len(cn_nums) else str(list_counter)
-                result.append(f"{num}、{content}")
-            elif numbering == "none":
-                result.append(content)
-        else:
-            # 非编号非空行 → 重置列表计数器（空行不重置）
-            if stripped:
-                list_counter = 0
-            result.append(line)
-
-    return '\n'.join(result)
-
-
-def _create_numbering_instance(doc):
-    """为新的编号列表创建独立的编号实例，确保编号从1重新开始。
-
-    python-docx的List Number样式所有段落共用一个编号序列，
-    不会在新列表处重置——第一章编到26，第二章接着从27开始。
-    此函数创建新的numId + startOverride解决该问题。
-    """
-    from docx.oxml.ns import qn
-    from docx.oxml import OxmlElement
-
-    numbering = doc.part.numbering_part.element
-
-    existing_nums = numbering.findall(qn('w:num'))
-    max_num_id = max([int(n.get(qn('w:numId'))) for n in existing_nums], default=0)
-
-    abstract_nums = numbering.findall(qn('w:abstractNum'))
-    if not abstract_nums:
-        return None
-    abs_id = abstract_nums[0].get(qn('w:abstractNumId'))
-
-    new_num_id = max_num_id + 1
-
-    num = OxmlElement('w:num')
-    num.set(qn('w:numId'), str(new_num_id))
-
-    abs_ref = OxmlElement('w:abstractNumId')
-    abs_ref.set(qn('w:val'), abs_id)
-    num.append(abs_ref)
-
-    lvl_override = OxmlElement('w:lvlOverride')
-    lvl_override.set(qn('w:ilvl'), '0')
-    start_override = OxmlElement('w:startOverride')
-    start_override.set(qn('w:val'), '1')
-    lvl_override.append(start_override)
-    num.append(lvl_override)
-
-    numbering.append(num)
-    return new_num_id
-
-
-def _apply_numbering(paragraph, num_id):
-    """给段落应用指定的编号实例（覆盖样式默认的numId）"""
-    from docx.oxml.ns import qn
-    from docx.oxml import OxmlElement
-
-    pPr = paragraph._element.get_or_add_pPr()
-    numPr = OxmlElement('w:numPr')
-    ilvl = OxmlElement('w:ilvl')
-    ilvl.set(qn('w:val'), '0')
-    numId_el = OxmlElement('w:numId')
-    numId_el.set(qn('w:val'), str(num_id))
-    numPr.append(ilvl)
-    numPr.append(numId_el)
-    pPr.append(numPr)
 
 
 def generate_docx(markdown_text, output_path):
@@ -457,21 +319,9 @@ def generate_docx(markdown_text, output_path):
     lines = markdown_text.split('\n')
     in_table = False
     table_rows = []
-    in_numbered_list = False
-    current_num_id = None
 
     for line in lines:
         stripped = line.strip()
-
-        # 判断是否是编号列表项（用于检测新列表起点）
-        is_numbered = (
-            bool(stripped)
-            and len(stripped) > 2
-            and stripped[0:2].rstrip('.').isdigit()
-            and '. ' in stripped[:5]
-        )
-        if not is_numbered:
-            in_numbered_list = False
 
         # 跳过空行
         if not stripped:
@@ -515,15 +365,9 @@ def generate_docx(markdown_text, output_path):
         elif stripped.startswith('- [ ] '):
             p = doc.add_paragraph(style='List Bullet')
             p.add_run(f"☐ {stripped[6:]}")
-        elif is_numbered:
+        elif stripped[0:2].rstrip('.').isdigit() and '. ' in stripped[:5]:
             idx = stripped.index('. ')
-            # 新列表起点：创建独立编号实例
-            if not in_numbered_list:
-                current_num_id = _create_numbering_instance(doc)
-                in_numbered_list = True
-            p = doc.add_paragraph(stripped[idx+2:], style='List Number')
-            if current_num_id is not None:
-                _apply_numbering(p, current_num_id)
+            doc.add_paragraph(stripped[idx+2:], style='List Number')
         else:
             doc.add_paragraph(stripped)
 
@@ -636,11 +480,10 @@ def main():
     parser.add_argument('--purchaser', help='采购人')
     parser.add_argument('--budget', type=int, help='预算金额（元，纯数字）')
     parser.add_argument('--config', help='从JSON文件读取项目信息')
+    parser.add_argument('--scoring-config', dest='scoring_config',
+                        help='从YAML文件加载自定义评分模板（覆盖默认评分维度/分值/细则）')
     parser.add_argument('-o', '--output', default='招标文件.md', help='输出文件名')
     parser.add_argument('--docx', action='store_true', help='同时生成Word文档')
-    parser.add_argument('--numbering', choices=['arabic', 'multi', 'chinese', 'none'],
-                        default='arabic',
-                        help='编号风格：arabic(1.2.3 默认)/multi(1.1 1.2)/chinese(一、二、)/none(不编号)')
     args = parser.parse_args()
 
     # 收集项目信息
@@ -655,12 +498,21 @@ def main():
             'budget': args.budget or '',
         }
 
-    # 生成Markdown
-    md_text = generate_markdown(project_info, args.type)
+    # 加载自定义评分模板（可选）
+    scoring_override = None
+    if args.scoring_config:
+        try:
+            scoring_override = load_scoring_config(args.scoring_config)
+            print(f"✅ 已加载自定义评分模板：{args.scoring_config}")
+            for ptype, items in scoring_override.items():
+                total = sum(item.get('score', 0) for item in items)
+                print(f"   {ptype}: {len(items)}个评分维度，总分{total}")
+        except (FileNotFoundError, ValueError) as e:
+            print(f"❌ 加载评分模板失败：{e}")
+            sys.exit(1)
 
-    # 编号风格转换（非arabic模式把编号内嵌到文本中）
-    if args.numbering != "arabic":
-        md_text = _convert_numbering(md_text, args.numbering)
+    # 生成Markdown
+    md_text = generate_markdown(project_info, args.type, scoring_override)
 
     # 写入文件
     with open(args.output, 'w', encoding='utf-8') as f:
