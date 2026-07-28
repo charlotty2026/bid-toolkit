@@ -43,16 +43,26 @@ def cmd_engine(args):
 
 
 def cmd_check(args):
-    """标书格式自检"""
+    """标书格式自检 + 评分项覆盖检查"""
     mod = _load_script("fix_bid_format.py")
     print(f"🔍 格式检查: {args.file}")
-    # 先跑扫描，捕获修复阶段的错误
     sys.argv = ["fix_bid_format.py", args.file]
     try:
         mod.main()
     except TypeError as e:
         print(f"\n⚠️  扫描完成，但自动修复阶段遇到小问题: {e}")
         print("   可手动查看生成的扫描报告")
+
+    # 评分项覆盖检查
+    if args.coverage:
+        print(f"\n{'='*60}")
+        print(f"📋 评分项覆盖检查")
+        print(f"{'='*60}")
+        cov_mod = _load_script("coverage_check.py")
+        sys.argv = ["coverage_check.py", args.file]
+        if args.coverage_type:
+            sys.argv.extend(["--type", args.coverage_type])
+        cov_mod.main()
 
 
 def cmd_rfp(args):
@@ -93,7 +103,7 @@ def cmd_list(args=None):
     """列出所有可用工具"""
     tools = [
         ("engine",  "Markdown转Word标书排版",  "bid engine input.md -o output.docx"),
-        ("check",   "标书格式自检",            "bid check input.docx"),
+        ("check",   "标书格式自检 + 评分项覆盖", "bid check input.docx --coverage"),
         ("rfp",     "招标文件生成器",          "bid rfp --type services --project XX项目"),
         ("desense", "敏感信息脱敏扫描",        "bid desense input.docx"),
     ]
@@ -118,8 +128,10 @@ def main():
     p.add_argument("-o", "--output", default=None, help="输出 Word 路径")
 
     # check
-    p = sub.add_parser("check", help="标书格式自检")
+    p = sub.add_parser("check", help="标书格式自检 + 评分项覆盖检查")
     p.add_argument("file", help="Word 文件路径")
+    p.add_argument("--coverage", action="store_true", help="同时检查评分项覆盖情况")
+    p.add_argument("--coverage-type", "-t", choices=["工程", "服务", "货物"], help="标书类型（不指定则自动识别）")
 
     # rfp
     p = sub.add_parser("rfp", help="招标文件生成")
