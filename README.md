@@ -40,13 +40,38 @@
 
 ## 快速开始
 
-### 安装依赖
+### 一行命令安装
 
 ```bash
-pip install python-docx markdown pyyaml PyMuPDF
+pip install git+https://github.com/charlotty2026/bid-toolkit.git
 ```
 
-### 拆解招标文件（v3.1 新增）
+装完直接跑：
+
+```bash
+# Markdown → Word 标书排版
+bid engine 标书.md -o 标书.docx
+
+# 标书格式自检
+bid check 标书.docx
+
+# 生成招标文件（服务类）
+bid rfp --type services --project "XX物业服务项目" --budget 500000
+
+# 敏感信息脱敏扫描
+bid desense 标书.docx
+```
+
+> 💡 还在用 `git clone + cd scripts + python xxx.py` 五步大法？装完 `bid` 命令全局可用，零门槛。
+
+### 传统方式（不装包直接跑）
+
+```bash
+git clone https://github.com/charlotty2026/bid-toolkit.git
+cd bid-toolkit
+pip install -r requirements.txt
+python scripts/bid_engine.py 标书.md -o 标书.docx
+```
 
 ```bash
 # 拆解PDF招标文件，输出JSON

@@ -1,0 +1,1 @@
+../../scripts/scan_placeholders.py

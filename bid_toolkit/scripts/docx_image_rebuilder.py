@@ -1,0 +1,1 @@
+../../scripts/docx_image_rebuilder.py

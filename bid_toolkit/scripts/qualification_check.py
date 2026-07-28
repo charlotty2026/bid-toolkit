@@ -1,0 +1,1 @@
+../../scripts/qualification_check.py

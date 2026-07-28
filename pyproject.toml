@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bid-toolkit"
+version = "0.2.0"
+description = "招投标全流程工具链——Markdown转Word、格式检测、RFP生成、脱敏扫描"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "charlotty2026", email = "charlotty8078@agent.qq.com"}
+]
+dependencies = [
+    "python-docx>=0.8.11",
+    "markdown>=3.4",
+    "pyyaml>=6.0",
+    "PyMuPDF>=1.23.0",
+    "pdfplumber>=0.7.0",
+    "pypinyin>=0.49.0",
+    "jieba>=0.42.1",
+]
+keywords = ["bid", "tender", "procurement", "document", "automation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Legal Industry",
+    "Topic :: Office/Business :: Office Suites",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://github.com/charlotty2026/bid-toolkit"
+Repository = "https://github.com/charlotty2026/bid-toolkit"
+
+[project.scripts]
+bid = "bid_toolkit:main"
+
+[tool.setuptools.packages.find]
+include = ["bid_toolkit", "bid_toolkit.*"]
+
+[tool.setuptools.package-data]
+bid_toolkit = ["scripts/*.py"]
+
+[tool.setuptools]
+zip-safe = false

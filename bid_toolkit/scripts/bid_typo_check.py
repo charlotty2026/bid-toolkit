@@ -1,0 +1,1 @@
+../../scripts/bid_typo_check.py

@@ -1,0 +1,1 @@
+../../scripts/smart_merge.py

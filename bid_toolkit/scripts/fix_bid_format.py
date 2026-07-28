@@ -1,0 +1,1 @@
+../../scripts/fix_bid_format.py

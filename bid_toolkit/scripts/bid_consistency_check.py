@@ -1,0 +1,1 @@
+../../scripts/bid_consistency_check.py
