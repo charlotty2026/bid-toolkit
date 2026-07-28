@@ -1,0 +1,64 @@
+# ===== 用户配置文件 =====
+# 复制此文件为 user_config.yaml，填入你自己的配置后使用
+# 所有带 *** 的字段必须自行修改
+
+# ===== LLM 大模型配置 =====
+# 支持 OpenAI 兼容接口：DeepSeek / 百度千帆 / 通义千问 / Ollama 等
+llm:
+  # --- 必填 ---
+  api_key: ""                    # *** 你的API Key，如 sk-xxx
+  base_url: ""                   # *** API地址，例如：
+                                 #   DeepSeek:  https://api.deepseek.com/v1
+                                 #   千帆:      https://qianfan.baidubce.com/v2
+                                 #   通义千问:   https://dashscope.aliyuncs.com/compatible-mode/v1
+                                 #   Ollama本地: http://localhost:11434/v1
+  model: "deepseek-chat"         # *** 模型名，例如：deepseek-chat / qwen-plus / glm-4 等
+
+  # --- 可选（有默认值） ---
+  temperature: 0.7               # 生成温度，0=确定性，1=创造性，标书建议0.5-0.7
+  max_tokens: 4096              # 单次请求最大token数
+  timeout: 60                   # 单次请求超时（秒）
+
+  # 重试机制
+  retry:
+    max_attempts: 3             # 最大重试次数（含首次请求）
+    base_delay: 2               # 基础退避延迟（秒），指数增长
+    max_delay: 30               # 最大退避延迟（秒）
+
+# ===== 编号风格配置 =====
+# 控制生成Markdown中的标题编号风格
+# bid_generator会根据此配置在Markdown源码中写入编号
+numbering:
+  style: "multi"                # 编号风格：
+                                 #   simple:  1. 2. 3.（单级编号）
+                                 #   multi:   1.1 1.2 1.1.1（多级编号，默认）
+                                 #   chinese: 一、 (一) 1.（中文编号）
+                                 #   off:     不自动编号（手动写）
+
+# ===== 下划线占位符配置 =====
+# parse_bid提取招标文件中的下划线占位符时使用
+# underline_check质检投标文件时会检查这些占位符是否已填写
+underline_patterns:
+  # 默认常见模式，可直接使用
+  - "(致[：:]\\s*)(_{3,})(\\s*（[^）]+）)"      # 致：_________（招标人）
+  - "(根据[：:]\\s*)(_{3,})(\\s*（[^）]+）)"     # 根据：_________（招标文件编号）
+  - "(项目名称[：:]\\s*)(_{3,})"                # 项目名称：_________
+  - "(项目编号[：:]\\s*)(_{3,})"                # 项目编号：_________
+  - "(投标人[：:]\\s*)(_{3,})"                  # 投标人：_________（盖章）
+  - "(法定代表人[：:]\\s*)(_{3,})"              # 法定代表人：_________
+  - "(联系电话[：:]\\s*)(_{3,})"                # 联系电话：_________
+  - "(联系地址[：:]\\s*)(_{3,})"                # 联系地址：_________
+  - "(日期[：:]\\s*)(_{3,})"                    # 日期：_________
+  - "(金额[：:]\\s*)(_{3,})"                    # 金额：_________
+  # 用户可在此添加自定义模式，格式同上
+
+# ===== 企业素材库配置 =====
+company_profile:
+  dir: "company_profile"        # 企业素材目录名（相对于项目根目录）
+
+# ===== 资质检查配置（可选） =====
+qualification_check:
+  # 外部工商API（可选，不配则只做文档内部核对）
+  enabled: false                # 是否启用外部API查询
+  provider: ""                  # 天眼查/企查查等
+  api_key: ""                   # 外部API Key

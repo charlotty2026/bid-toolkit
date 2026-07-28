@@ -1,0 +1,477 @@
+{
+  "placeholders": {
+    "goods": {
+      "total_placeholders": 0,
+      "unique_placeholders": 0,
+      "char_count": 16731,
+      "real_content_chars": 16731,
+      "content_ratio": 100.0,
+      "placeholder_list": []
+    },
+    "services": {
+      "total_placeholders": 0,
+      "unique_placeholders": 0,
+      "char_count": 17009,
+      "real_content_chars": 17009,
+      "content_ratio": 100.0,
+      "placeholder_list": []
+    },
+    "engineering": {
+      "total_placeholders": 0,
+      "unique_placeholders": 0,
+      "char_count": 16388,
+      "real_content_chars": 16388,
+      "content_ratio": 100.0,
+      "placeholder_list": []
+    }
+  },
+  "core_templates": {
+    "goods": {
+      "scoring": {
+        "items_count": 7,
+        "total_score": 100,
+        "is_100": true,
+        "has_price_score": true,
+        "has_material_column": true,
+        "sample": "评分标准、废标条款\n\n2. 投标人应仔细阅读招标文件的全部内容，按招标文件要求编制投标文件。\n3. 招标文件如有不一致之处，以前附表为准。\n\n## 招标文件的澄清与修改\n\n**招标文件的澄清与修改**\n\n1. 投标人对招标文件如有疑问，应在投标截止时间10日前以书面形式向采购人提出。\n2. 采购人应当在收到疑问后3个工作日内作出答复。\n3. 采购人可以在投标截止时间15日前对招标文件进行澄清或修改，澄清或修改内容作为招标文件的组成部分。\n4. 澄清或修改内容可能影响投标文件编制的，采购人应当顺延投标截止时间。\n\n> 法律依据：87号令第27条，采购人可在投标截止15个工作日前发出澄清/修改。\n\n## 投标文件编制\n\n**投标文件编制**\n\n1. 投标文件应按招标文件规定的格式和要求编制，包括：\n   - 资格证明文件\n   - 价格文件（投标报价表）\n   - 技术方案/服务方案\n   - 商务文件\n   - 其他附件\n\n2. 投标文件应使用中文编制，使用A4纸打印。\n3. 投标文件应编列目录，标注页码，逐页加盖投标人公章。\n4. 投标文件的正本和副本应在封面上明确标注\"正本\"或\"副本"
+      },
+      "rejection": {
+        "categories": 3,
+        "total_clauses": 16,
+        "has_legal_basis": true,
+        "sample": "废标条款\n\n2. 投标人应仔细阅读招标文件的全部内容，按招标文件要求编制投标文件。\n3. 招标文件如有不一致之处，以前附表为准。\n\n## 招标文件的澄清与修改\n\n**招标文件的澄清与修改**\n\n1. 投标人对招标文件如有疑问，应在投标截止时间10日前以书面形式向采购人提出。\n2. 采购人应当在收到疑问后3个工作日内作出答复。\n3. 采购人可以在投标截止时间15日前对招标文件进行澄清或修改，澄清或修改内容作为招标文件的组成部分。\n4. 澄清或修改内容可能影响投标文件编制的，采购人应当顺延投标截止时间。\n\n> 法律依据：87号令第27条，采购人可在投标截止15个工作日前发出澄清/修改。\n\n## 投标文件编制\n\n**投标文件编制**\n\n1. 投标文件应按招标文件规定的格式和要求编制，包括：\n   - 资格证明文件\n   - 价格文件（投标报价表）\n   - 技术方案/服务方案\n   - 商务文件\n   - 其他附件\n\n2. 投标文件应使用中文编制，使用A4纸打印。\n3. 投标文件应编列目录，标注页码，逐页加盖投标人公章。\n4. 投标文件的正本和副本应在封面上明确标注\"正本\"或\"副本\"字样。\n"
+      },
+      "procurement": {
+        "found": true,
+        "sections": [
+          "项目概况",
+          "技术规格/服务要求",
+          "数量清单",
+          "质量标准",
+          "交货/服务期限",
+          "验收标准",
+          "售后服务"
+        ],
+        "key_fields": [
+          "技术参数",
+          "服务内容",
+          "数量",
+          "交货期",
+          "质量标准",
+          "验收标准",
+          "售后要求"
+        ],
+        "has_content": false
+      }
+    },
+    "services": {
+      "scoring": {
+        "items_count": 10,
+        "total_score": 100,
+        "is_100": true,
+        "has_price_score": true,
+        "has_material_column": true,
+        "sample": "评分标准、废标条款\n\n2. 投标人应仔细阅读招标文件的全部内容，按招标文件要求编制投标文件。\n3. 招标文件如有不一致之处，以前附表为准。\n\n## 招标文件的澄清与修改\n\n**招标文件的澄清与修改**\n\n1. 投标人对招标文件如有疑问，应在投标截止时间10日前以书面形式向采购人提出。\n2. 采购人应当在收到疑问后3个工作日内作出答复。\n3. 采购人可以在投标截止时间15日前对招标文件进行澄清或修改，澄清或修改内容作为招标文件的组成部分。\n4. 澄清或修改内容可能影响投标文件编制的，采购人应当顺延投标截止时间。\n\n> 法律依据：87号令第27条，采购人可在投标截止15个工作日前发出澄清/修改。\n\n## 投标文件编制\n\n**投标文件编制**\n\n1. 投标文件应按招标文件规定的格式和要求编制，包括：\n   - 资格证明文件\n   - 价格文件（投标报价表）\n   - 技术方案/服务方案\n   - 商务文件\n   - 其他附件\n\n2. 投标文件应使用中文编制，使用A4纸打印。\n3. 投标文件应编列目录，标注页码，逐页加盖投标人公章。\n4. 投标文件的正本和副本应在封面上明确标注\"正本\"或\"副本"
+      },
+      "rejection": {
+        "categories": 3,
+        "total_clauses": 16,
+        "has_legal_basis": true,
+        "sample": "废标条款\n\n2. 投标人应仔细阅读招标文件的全部内容，按招标文件要求编制投标文件。\n3. 招标文件如有不一致之处，以前附表为准。\n\n## 招标文件的澄清与修改\n\n**招标文件的澄清与修改**\n\n1. 投标人对招标文件如有疑问，应在投标截止时间10日前以书面形式向采购人提出。\n2. 采购人应当在收到疑问后3个工作日内作出答复。\n3. 采购人可以在投标截止时间15日前对招标文件进行澄清或修改，澄清或修改内容作为招标文件的组成部分。\n4. 澄清或修改内容可能影响投标文件编制的，采购人应当顺延投标截止时间。\n\n> 法律依据：87号令第27条，采购人可在投标截止15个工作日前发出澄清/修改。\n\n## 投标文件编制\n\n**投标文件编制**\n\n1. 投标文件应按招标文件规定的格式和要求编制，包括：\n   - 资格证明文件\n   - 价格文件（投标报价表）\n   - 技术方案/服务方案\n   - 商务文件\n   - 其他附件\n\n2. 投标文件应使用中文编制，使用A4纸打印。\n3. 投标文件应编列目录，标注页码，逐页加盖投标人公章。\n4. 投标文件的正本和副本应在封面上明确标注\"正本\"或\"副本\"字样。\n"
+      },
+      "procurement": {
+        "found": true,
+        "sections": [
+          "项目概况",
+          "技术规格/服务要求",
+          "数量清单",
+          "质量标准",
+          "交货/服务期限",
+          "验收标准",
+          "售后服务"
+        ],
+        "key_fields": [
+          "技术参数",
+          "服务内容",
+          "数量",
+          "交货期",
+          "质量标准",
+          "验收标准",
+          "售后要求"
+        ],
+        "has_content": false
+      }
+    },
+    "engineering": {
+      "scoring": {
+        "items_count": 9,
+        "total_score": 100,
+        "is_100": true,
+        "has_price_score": true,
+        "has_material_column": true,
+        "sample": "评分标准、废标条款\n\n2. 投标人应仔细阅读招标文件的全部内容，按招标文件要求编制投标文件。\n3. 招标文件如有不一致之处，以前附表为准。\n\n## 招标文件的澄清与修改\n\n**招标文件的澄清与修改**\n\n1. 投标人对招标文件如有疑问，应在投标截止时间10日前以书面形式向采购人提出。\n2. 采购人应当在收到疑问后3个工作日内作出答复。\n3. 采购人可以在投标截止时间15日前对招标文件进行澄清或修改，澄清或修改内容作为招标文件的组成部分。\n4. 澄清或修改内容可能影响投标文件编制的，采购人应当顺延投标截止时间。\n\n> 法律依据：87号令第27条，采购人可在投标截止15个工作日前发出澄清/修改。\n\n## 投标文件编制\n\n**投标文件编制**\n\n1. 投标文件应按招标文件规定的格式和要求编制，包括：\n   - 资格证明文件\n   - 价格文件（投标报价表）\n   - 技术方案/服务方案\n   - 商务文件\n   - 其他附件\n\n2. 投标文件应使用中文编制，使用A4纸打印。\n3. 投标文件应编列目录，标注页码，逐页加盖投标人公章。\n4. 投标文件的正本和副本应在封面上明确标注\"正本\"或\"副本"
+      },
+      "rejection": {
+        "categories": 3,
+        "total_clauses": 16,
+        "has_legal_basis": true,
+        "sample": "废标条款\n\n2. 投标人应仔细阅读招标文件的全部内容，按招标文件要求编制投标文件。\n3. 招标文件如有不一致之处，以前附表为准。\n\n## 招标文件的澄清与修改\n\n**招标文件的澄清与修改**\n\n1. 投标人对招标文件如有疑问，应在投标截止时间10日前以书面形式向采购人提出。\n2. 采购人应当在收到疑问后3个工作日内作出答复。\n3. 采购人可以在投标截止时间15日前对招标文件进行澄清或修改，澄清或修改内容作为招标文件的组成部分。\n4. 澄清或修改内容可能影响投标文件编制的，采购人应当顺延投标截止时间。\n\n> 法律依据：87号令第27条，采购人可在投标截止15个工作日前发出澄清/修改。\n\n## 投标文件编制\n\n**投标文件编制**\n\n1. 投标文件应按招标文件规定的格式和要求编制，包括：\n   - 资格证明文件\n   - 价格文件（投标报价表）\n   - 技术方案/服务方案\n   - 商务文件\n   - 其他附件\n\n2. 投标文件应使用中文编制，使用A4纸打印。\n3. 投标文件应编列目录，标注页码，逐页加盖投标人公章。\n4. 投标文件的正本和副本应在封面上明确标注\"正本\"或\"副本\"字样。\n"
+      },
+      "procurement": {
+        "found": true,
+        "sections": [
+          "项目概况",
+          "技术规格/服务要求",
+          "数量清单",
+          "质量标准",
+          "交货/服务期限",
+          "验收标准",
+          "售后服务"
+        ],
+        "key_fields": [
+          "技术参数",
+          "服务内容",
+          "数量",
+          "交货期",
+          "质量标准",
+          "验收标准",
+          "售后要求"
+        ],
+        "has_content": false
+      }
+    }
+  },
+  "differentiation": {
+    "goods": {
+      "chapter_count": 8,
+      "chapter_titles": [
+        "投标邀请",
+        "投标人须知",
+        "资格审查",
+        "采购需求",
+        "评标办法",
+        "合同条款",
+        "投标文件格式",
+        "政府采购政策落实"
+      ],
+      "total_sections": 51,
+      "total_key_fields": 49,
+      "scoring_template": {
+        "价格分": 30,
+        "技术分": 50,
+        "商务分": 20
+      },
+      "has_gov_policy_chapter": true,
+      "has_engineering_extras": false
+    },
+    "services": {
+      "chapter_count": 8,
+      "chapter_titles": [
+        "投标邀请",
+        "投标人须知",
+        "资格审查",
+        "采购需求",
+        "评标办法",
+        "合同条款",
+        "投标文件格式",
+        "政府采购政策落实"
+      ],
+      "total_sections": 51,
+      "total_key_fields": 49,
+      "scoring_template": {
+        "价格分": 10,
+        "技术分": 60,
+        "商务分": 30
+      },
+      "has_gov_policy_chapter": true,
+      "has_engineering_extras": false
+    },
+    "engineering": {
+      "chapter_count": 11,
+      "chapter_titles": [
+        "投标邀请",
+        "投标人须知",
+        "资格审查",
+        "采购需求",
+        "评标办法",
+        "合同条款",
+        "投标文件格式",
+        "技术条件（工程建设标准）",
+        "图纸及勘察资料",
+        "工程量清单",
+        "最高投标限价"
+      ],
+      "total_sections": 58,
+      "total_key_fields": 53,
+      "scoring_template": {
+        "价格分": 20,
+        "技术分": 60,
+        "商务分": 20
+      },
+      "has_gov_policy_chapter": false,
+      "has_engineering_extras": true
+    }
+  },
+  "compliance": {
+    "红线1: 资格条件排斥潜在投标人": {
+      "exclusionary_hits": 4,
+      "exclusionary_reasons": [
+        "注册资本门槛，可能排他",
+        "企业规模要求，排他",
+        "业绩门槛，可能排他",
+        "本地企业要求，涉嫌排他"
+      ],
+      "rejection_detected_missing": true,
+      "required_sections_missing": 4,
+      "time_nodes_warns": 5,
+      "overall_fail": 13,
+      "overall_warn": 15,
+      "overall_pass": 2,
+      "verdict": "不合规"
+    },
+    "红线2: 评审标准模糊不可量化": {
+      "exclusionary_hits": 0,
+      "exclusionary_reasons": [],
+      "rejection_detected_missing": true,
+      "required_sections_missing": 5,
+      "time_nodes_warns": 5,
+      "overall_fail": 13,
+      "overall_warn": 10,
+      "overall_pass": 3,
+      "verdict": "不合规"
+    },
+    "红线3: 废标条款缺失": {
+      "exclusionary_hits": 0,
+      "exclusionary_reasons": [],
+      "rejection_detected_missing": false,
+      "required_sections_missing": 5,
+      "time_nodes_warns": 5,
+      "overall_fail": 10,
+      "overall_warn": 11,
+      "overall_pass": 5,
+      "verdict": "不合规"
+    },
+    "红线4: 等标期不足": {
+      "exclusionary_hits": 0,
+      "exclusionary_reasons": [],
+      "rejection_detected_missing": true,
+      "required_sections_missing": 5,
+      "time_nodes_warns": 3,
+      "overall_fail": 14,
+      "overall_warn": 9,
+      "overall_pass": 3,
+      "verdict": "不合规"
+    },
+    "红线5: 中小企业政策缺失": {
+      "exclusionary_hits": 0,
+      "exclusionary_reasons": [],
+      "rejection_detected_missing": true,
+      "required_sections_missing": 4,
+      "time_nodes_warns": 5,
+      "overall_fail": 6,
+      "overall_warn": 11,
+      "overall_pass": 9,
+      "verdict": "不合规"
+    },
+    "红线6: 地域限制": {
+      "exclusionary_hits": 1,
+      "exclusionary_reasons": [
+        "机构设立要求，可能排他"
+      ],
+      "rejection_detected_missing": true,
+      "required_sections_missing": 4,
+      "time_nodes_warns": 5,
+      "overall_fail": 13,
+      "overall_warn": 12,
+      "overall_pass": 2,
+      "verdict": "不合规"
+    }
+  },
+  "real_comparison": {
+    "services": [
+      {
+        "filename": "上海华铁列车库内保洁服务_招标_2025.docx",
+        "char_count": 39820,
+        "chapters_found": [],
+        "has_scoring": true,
+        "has_rejection": true,
+        "has_front_sheet": false,
+        "has_qualification": true,
+        "has_procurement": true,
+        "compliance": {
+          "pass": 13,
+          "warn": 8,
+          "fail": 7,
+          "verdict": "不合规"
+        }
+      },
+      {
+        "filename": "南大地区基地物业管理服务_招标_2026.docx",
+        "char_count": 26914,
+        "chapters_found": [
+          "第三章  评标办法\t17",
+          "第一章  投标人须知及前附表",
+          "第一章  供应商须知及前附表\t4",
+          "第二章  服务需求书",
+          "第二章  项目需求\t15",
+          "第四章  合同条款\t20",
+          "第六章    投标文件有关格式",
+          "第四章  合同条款",
+          "第五章  响应格式\t30"
+        ],
+        "has_scoring": true,
+        "has_rejection": true,
+        "has_front_sheet": true,
+        "has_qualification": true,
+        "has_procurement": true,
+        "compliance": {
+          "pass": 20,
+          "warn": 2,
+          "fail": 3,
+          "verdict": "不合规"
+        }
+      },
+      {
+        "filename": "厦门国际银行零售业务劳务外包_招标_2026.docx",
+        "char_count": 38752,
+        "chapters_found": [
+          "第二章  服务需求一览表",
+          "第三章“技术要求”",
+          "第六章，并加盖投标人公章。",
+          "第六章  资格证明文件",
+          "第五章  各种格式\t45",
+          "第五章中所附的格式填报“商务条款响应/偏离表”。",
+          "第一章  投标人须知及前附表",
+          "第五章中所附的“投标函格式”完整地填写投标函。",
+          "第三章  服务技术要求\t22",
+          "第七章  评标办法\t63",
+          "第六章的规定。除没有修改过的印刷文件（如公司样本等）外，正本投标文",
+          "第七章  评标办法",
+          "第五章  各种格式",
+          "第二章  服务需求一览表\t20",
+          "第六章中所附的资格证明文件。"
+        ],
+        "has_scoring": true,
+        "has_rejection": true,
+        "has_front_sheet": true,
+        "has_qualification": true,
+        "has_procurement": true,
+        "compliance": {
+          "pass": 19,
+          "warn": 2,
+          "fail": 4,
+          "verdict": "不合规"
+        }
+      }
+    ],
+    "goods": [
+      {
+        "filename": "喀什地区维吾尔医医院医疗设备采购_公开招标_2026.docx",
+        "char_count": 62801,
+        "chapters_found": [
+          "第2章  投标文件格式\t21",
+          "第7章  政府采购合同\t68",
+          "第5章  采购需求及项目要求",
+          "第3章  投标邀请",
+          "第5章  采购需求及项目要求\t52",
+          "第6章  评标方法和标准\t57",
+          "第1章  供应商须知\t4",
+          "第六章：",
+          "第7章  政府采购合同格式",
+          "第2章  投标文件格式",
+          "第4章  供应商须知资料表",
+          "第6章。",
+          "第4章  供应商须知资料表\t47",
+          "第6章  评标方法和标准",
+          "第7章  政府采购合同"
+        ],
+        "has_scoring": true,
+        "has_rejection": true,
+        "has_front_sheet": false,
+        "has_qualification": true,
+        "has_procurement": true,
+        "compliance": {
+          "pass": 20,
+          "warn": 4,
+          "fail": 2,
+          "verdict": "不合规"
+        }
+      },
+      {
+        "filename": "昆明海关_手持式X荧光光谱仪_招标公告.docx",
+        "char_count": 2100,
+        "chapters_found": [
+          "第三章“项目需求书”。"
+        ],
+        "has_scoring": false,
+        "has_rejection": true,
+        "has_front_sheet": false,
+        "has_qualification": true,
+        "has_procurement": true,
+        "compliance": {
+          "pass": 9,
+          "warn": 7,
+          "fail": 10,
+          "verdict": "不合规"
+        }
+      }
+    ],
+    "engineering": [
+      {
+        "filename": "银川国芳外墙logo字制作安装_招标_2026.docx",
+        "char_count": 3667,
+        "chapters_found": [
+          "第四章 评标办法（综合评估法，总分100分）",
+          "第六章 投标文件格式（略）",
+          "第一章 招标公告",
+          "第七章 附件",
+          "第二章 投标人须知",
+          "第五章 合同主要条款（摘要）"
+        ],
+        "has_scoring": true,
+        "has_rejection": false,
+        "has_front_sheet": false,
+        "has_qualification": true,
+        "has_procurement": true,
+        "compliance": {
+          "pass": 11,
+          "warn": 6,
+          "fail": 10,
+          "verdict": "不合规"
+        }
+      },
+      {
+        "filename": "工程项目供应商目录建立_公开招标_2026.docx",
+        "char_count": 57210,
+        "chapters_found": [
+          "第三章内容进行调整的，以调整后的内容为准），认真填写《资格证明文件",
+          "第二章 合同通用条款",
+          "第七章 合同样本",
+          "第三章 投标文件内容及格式\t34",
+          "第一章 投标供应商须知\t1",
+          "第三章投标文件内容及格式。",
+          "第七章 合同样本\t84",
+          "第五章 招标公告\t76",
+          "第五章“招标公告”第四条",
+          "第二章 合同通用条款\t29",
+          "第一章 投标供应商须知",
+          "第五章 招标公告",
+          "第三章“投标文件内容及格式”中的“供应商承诺声明”，并签字盖章确认",
+          "第四章 投标供应商须知前附表",
+          "第三章明确的格式编制投标文件。"
+        ],
+        "has_scoring": true,
+        "has_rejection": true,
+        "has_front_sheet": true,
+        "has_qualification": true,
+        "has_procurement": true,
+        "compliance": {
+          "pass": 17,
+          "warn": 5,
+          "fail": 5,
+          "verdict": "不合规"
+        }
+      }
+    ]
+  }
+}

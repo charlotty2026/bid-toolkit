@@ -526,14 +526,18 @@ def check_heading_styles(doc):
     return issues
 
 def strip_md_residue(text):
-    """去除Markdown残留语法标记，保留纯文本内容。"""
+    """去除Markdown残留语法标记，保留纯文本内容。
+    
+    注意：标书中有大量乘号（A*B*C），禁掉斜体 `*text*` 处理。
+    只处理：图片、链接、删除线、粗体、内联代码、行首引用。
+    """
     # 图片
     text = re.sub(r'!\[([^\]]*)\]\(([^)]*)\)', r'[图片: \1]', text)
     # 链接
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1（\2）', text)
     # 删除线
     text = re.sub(r'~~(.+?)~~', r'\1', text)
-    # 粗体
+    # 粗体（仅保留 **bold** 双星号，单星号斜体已禁用——保护标书中的乘号）
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
     # 行内代码
     text = re.sub(r'`([^`]+)`', r'\1', text)
@@ -1086,7 +1090,7 @@ def print_check_report(results):
 
 # ===== 主入口 =====
 def main():
-    parser = argparse.ArgumentParser(description='标书自动化引擎 v3.2')
+    parser = argparse.ArgumentParser(description='标书自动化引擎 v3.5')
     parser.add_argument('input', nargs='?', default=None, help='Markdown输入文件（--check-scoring/--check-priority模式不需要）')
     parser.add_argument('-o', '--output', default=None, help='输出docx路径')
     parser.add_argument('--scan', action='store_true', help='仅扫描全角半角')
@@ -1153,7 +1157,12 @@ def main():
         sys.exit(0)
     
     if not os.path.exists(args.input):
-        print(f'❌ 文件不存在: {args.input}'); sys.exit(1)
+        print(f'❌ 文件不存在: {args.input}')
+        print('💡 提示: 请指定一个已有的Markdown文件。试试:')
+        print('   bid engine samples/某外包项目标书.md    # 用内置示例')
+        print('   bid engine 你的标书.md -o 输出.docx       # 用你自己的文件')
+        print('   bid list                                # 查看所有命令')
+        sys.exit(1)
     
     # 加载配置
     config = load_config(config_path=args.config, template_name=args.template)

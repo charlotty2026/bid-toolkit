@@ -62,6 +62,8 @@ def cmd_check(args):
         sys.argv = ["coverage_check.py", args.file]
         if args.coverage_type:
             sys.argv.extend(["--type", args.coverage_type])
+        if args.coverage_output:
+            sys.argv.extend(["--output", args.coverage_output])
         cov_mod.main()
 
 
@@ -132,6 +134,7 @@ def main():
     p.add_argument("file", help="Word 文件路径")
     p.add_argument("--coverage", action="store_true", help="同时检查评分项覆盖情况")
     p.add_argument("--coverage-type", "-t", choices=["工程", "服务", "货物"], help="标书类型（不指定则自动识别）")
+    p.add_argument("--coverage-output", help="覆盖检查报告导出路径（.txt / .md）")
 
     # rfp
     p = sub.add_parser("rfp", help="招标文件生成")
