@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>标书智能生成器</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Microsoft YaHei', sans-serif;
+    background: #f0f2f5;
+    color: #333;
+    padding: 20px;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 768px) {
+    .container { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e8e8e8;
+  }
+
+  .panel h2 {
+    font-size: 18px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #1a73e8;
+    color: #1a73e8;
+  }
+
+  .panel h3 {
+    font-size: 15px;
+    margin: 20px 0 12px;
+    color: #555;
+    border-left: 3px solid #1a73e8;
+    padding-left: 10px;
+  }
+
+  .panel h3:first-of-type { margin-top: 0; }
+
+  .field-group {
+    margin-bottom: 14px;
+  }
+
+  .field-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 4px;
+  }
+
+  .field-group label .required { color: #e74c3c; }
+
+  .field-group input,
+  .field-group textarea,
+  .field-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d9d9d9;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color .2s;
+    font-family: inherit;
+  }
+
+  .field-group input:focus,
+  .field-group textarea:focus,
+  .field-group select:focus {
+    outline: none;
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 2px rgba(26,115,232,0.15);
+  }
+
+  .field-group textarea {
+    resize: vertical;
+    min-height: 60px;
+  }
+
+  /* 右侧预览面板 */
+  .preview-panel { position: sticky; top: 20px; align-self: start; }
+
+  .preview-panel pre {
+    background: #f8f9fa;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 12px;
+    line-height: 1.6;
+    max-height: 500px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: 'Courier New', monospace;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+
+  .btn-primary {
+    background: #1a73e8;
+    color: #fff;
+  }
+  .btn-primary:hover { background: #1557b0; }
+
+  .btn-success {
+    background: #34a853;
+    color: #fff;
+  }
+  .btn-success:hover { background: #2d8f47; }
+
+  .btn-warning {
+    background: #fbbc04;
+    color: #333;
+  }
+  .btn-warning:hover { background: #e0a800; }
+
+  .btn-secondary {
+    background: #5f6368;
+    color: #fff;
+  }
+  .btn-secondary:hover { background: #4a4d52; }
+
+  .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #34a853;
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all .3s;
+    z-index: 999;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  .counter {
+    font-size: 12px;
+    color: #999;
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  .section-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .section-toggle .arrow {
+    transition: transform .2s;
+    font-size: 12px;
+  }
+  .section-toggle .arrow.collapsed { transform: rotate(-90deg); }
+  .section-body { transition: max-height .3s; overflow: hidden; }
+  .section-body.hidden { max-height: 0; }
+
+  /* 脱敏导出复选框 */
+  .anonymize-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 10px;
+    border: 1px solid #d9d9d9;
+    border-radius: 6px;
+    background: #fafafa;
+    transition: all .2s;
+  }
+  .anonymize-check:hover {
+    border-color: #1a73e8;
+    background: #f0f5ff;
+  }
+  .anonymize-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  /* 警告提示 */
+  .warning-note {
+    background: #fff3e0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #e65100;
+    line-height: 1.5;
+    border: 1px solid #ffe0b2;
+  }
+  .warning-note code {
+    background: #ffe0b2;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 左侧：填表单 -->
+  <div class="panel">
+    <h2>📋 标书信息填表</h2>
+    <p style="font-size:13px;color:#888;margin-bottom:16px;">填完所有字段 → 点「生成标书」→ 下载 .md 文件 → 跑 <code>bid engine 文件.md</code> 出Word</p>
+
+    <!-- ====== 基本信息 ====== -->
+    <h3 class="section-toggle" onclick="toggleSection(this)">
+      项目基本信息
+      <span class="arrow">▼</span>
+    </h3>
+    <div class="section-body">
+
+    <div class="field-group">
+      <label>项目名称 <span class="required">*</span></label>
+      <input id="project_name" placeholder="例：上海XX医院后勤服务外包项目">
+    </div>
+
+    <div class="field-group">
+      <label>招标编号</label>
+      <input id="bid_no" placeholder="例：0811-DSITC260750">
+    </div>
+
+    <div class="field-group">
+      <label>投标人全称 <span class="required">*</span></label>
+      <input id="bidder_name" placeholder="例：XX服务管理有限公司">
+    </div>
+
+    <div class="field-group">
+      <label>投标人简称</label>
+      <input id="bidder_short" placeholder="例：XX公司">
+    </div>
+
+    <div class="field-group">
+      <label>投标日期</label>
+      <input id="bid_date" type="date">
+    </div>
+
+    <div class="field-group">
+      <label>项目类型 <span class="required">*</span></label>
+      <select id="project_type">
+        <option value="人力外包">人力资源服务外包</option>
+        <option value="物业服务">物业服务/保安保洁</option>
+        <option value="货物采购">货物采购</option>
+        <option value="IT服务">IT技术服务</option>
+        <option value="其他">其他</option>
+      </select>
+    </div>
+
+    <div class="field-group">
+      <label>预算金额（万元）</label>
+      <input id="budget" placeholder="例：1094.8">
+    </div>
+    </div>
+
+    <!-- ====== 投标函 ====== -->
+    <h3 class="section-toggle" onclick="toggleSection(this)">
+      投标函
+      <span class="arrow">▼</span>
+    </h3>
+    <div class="section-body">
+
+    <div class="field-group">
+      <label>投标报价（万元）</label>
+      <input id="bid_price" placeholder="例：1050">
+    </div>
+
+    <div class="field-group">
+      <label>服务期限</label>
+      <input id="service_period" placeholder="例：自合同签订之日起一年">
+    </div>
+
+    <div class="field-group">
+      <label>法定代表人</label>
+      <input id="legal_person" placeholder="例：张三">
+    </div>
+
+    <div class="field-group">
+      <label>联系人</label>
+      <input id="contact_person" placeholder="例：李四">
+    </div>
+
+    <div class="field-group">
+      <label>联系电话</label>
+      <input id="contact_phone" placeholder="例：138XXXXXXXX">
+    </div>
+
+    <div class="field-group">
+      <label>投标有效期（天）</label>
+      <input id="bid_validity" type="number" value="90" placeholder="默认90天">
+    </div>
+    </div>
+
+    <!-- ====== 公司信息 ====== -->
+    <h3 class="section-toggle" onclick="toggleSection(this)">
+      公司信息
+      <span class="arrow">▼</span>
+    </h3>
+    <div class="section-body">
+
+    <div class="field-group">
+      <label>公司简介</label>
+      <textarea id="company_desc" rows="4" placeholder="公司成立时间、注册资本、主营业务、行业地位等"></textarea>
+    </div>
+
+    <div class="field-group">
+      <label>资质证书（每行一个）</label>
+      <textarea id="certificates" rows="3" placeholder="例：
+ISO9001质量管理体系认证
+ISO14001环境管理体系认证
+AAA企业信用等级证书"></textarea>
+    </div>
+
+    <div class="field-group">
+      <label>注册资金（万元）</label>
+      <input id="reg_capital" placeholder="例：1000">
+    </div>
+
+    <div class="field-group">
+      <label>成立年份</label>
+      <input id="found_year" placeholder="例：2010">
+    </div>
+
+    <div class="field-group">
+      <label>员工总数</label>
+      <input id="staff_count" placeholder="例：500">
+    </div>
+    </div>
+
+    <!-- ====== 技术/服务方案 ====== -->
+    <h3 class="section-toggle" onclick="toggleSection(this)">
+      技术/服务方案
+      <span class="arrow">▼</span>
+    </h3>
+    <div class="section-body">
+
+    <div class="field-group">
+      <label>服务内容概述</label>
+      <textarea id="service_desc" rows="5" placeholder="本项目服务范围、服务内容概述，包括但不限于..."></textarea>
+    </div>
+
+    <div class="field-group">
+      <label>项目重难点及对策</label>
+      <textarea id="challenges" rows="4" placeholder="项目重难点分析，及对应的解决措施..."></textarea>
+    </div>
+
+    <div class="field-group">
+      <label>服务保障措施</label>
+      <textarea id="guarantee" rows="4" placeholder="质量保障、安全保障、应急响应等措施..."></textarea>
+    </div>
+
+    <div class="field-group">
+      <label>人员配置方案</label>
+      <textarea id="staff_plan" rows="4" placeholder="拟投入人员数量、岗位结构、管理团队配置..."></textarea>
+    </div>
+    </div>
+
+    <!-- ====== 业绩 ====== -->
+    <h3 class="section-toggle" onclick="toggleSection(this)">
+      类似项目业绩
+      <span class="arrow">▼</span>
+    </h3>
+    <div class="section-body">
+
+    <div class="field-group">
+      <label>业绩列表（每行一条：项目名称|甲方|合同金额|年份）</label>
+      <textarea id="projects" rows="4" placeholder="例：
+XX医院后勤服务项目|XX医院|500万元|2023
+XX银行保洁服务项目|XX银行|300万元|2024"></textarea>
+    </div>
+    </div>
+
+    <!-- ====== 报价明细 ====== -->
+    <h3 class="section-toggle" onclick="toggleSection(this)">
+      报价明细
+      <span class="arrow">▼</span>
+    </h3>
+    <div class="section-body">
+
+    <div class="field-group">
+      <label>报价明细（每行一条：项目|金额|说明）</label>
+      <textarea id="price_detail" rows="4" placeholder="例：
+人工成本|800万元|含工资、社保、公积金
+管理费|50万元|含管理人员成本
+税费|30万元|增值税及附加"></textarea>
+    </div>
+
+    <div class="field-group">
+      <label>优惠承诺</label>
+      <input id="discount" placeholder="例：提供免费培训服务">
+    </div>
+    </div>
+
+    <!-- ====== 服务承诺 ====== -->
+    <h3 class="section-toggle" onclick="toggleSection(this)">
+      服务承诺
+      <span class="arrow">▼</span>
+    </h3>
+    <div class="section-body">
+
+    <div class="field-group">
+      <label>服务承诺内容</label>
+      <textarea id="commitments" rows="4" placeholder="质量承诺、交付承诺、售后承诺等..."></textarea>
+    </div>
+    </div>
+
+    <!-- ====== 封面可选 ====== -->
+    <h3 class="section-toggle" onclick="toggleSection(this)">
+      封面定制
+      <span class="arrow">▼</span>
+    </h3>
+    <div class="section-body">
+
+    <div class="field-group">
+      <label>封面标题行（不填则自动生成）</label>
+      <input id="cover_title" placeholder="例：正本/副本">
+    </div>
+
+    <div class="field-group">
+      <label>自定义封面公司logo文字</label>
+      <input id="cover_logo_text" placeholder="例：XX服务管理有限公司">
+    </div>
+    </div>
+
+  </div>
+
+  <!-- 右侧：预览+操作 -->
+  <div class="panel preview-panel">
+    <h2>⚙️ 生成 & 导出</h2>
+
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="generateBid()">✨ 生成标书</button>
+      <button class="btn btn-success" onclick="downloadMarkdown()">📥 下载 .md</button>
+      <button class="btn btn-warning" onclick="copyContent()">📋 复制内容</button>
+      <button class="btn btn-secondary" onclick="clearAll()">🗑️ 清空</button>
+      <label class="anonymize-check">
+        <input type="checkbox" id="anonymize_mode"> 🕶️ 脱敏导出
+      </label>
+    </div>
+
+    <div class="warning-note">
+      <strong>⚠️ 降级提示：</strong>请确保已安装 bid-toolkit（<code>pip install bid-toolkit</code>），否则只能生成 Markdown 文件
+    </div>
+
+    <div style="background:#e8f5e9;border-radius:6px;padding:12px;margin-bottom:16px;font-size:13px;color:#2e7d32;line-height:1.6;">
+      <strong>📌 生成后操作：</strong><br>
+      1. 下载 .md 文件<br>
+      2. 在服务器上跑：<code style="background:#c8e6c9;padding:2px 6px;border-radius:3px;font-size:12px;">bid engine 标书.md</code><br>
+      3. 自动输出格式规范的 Word 标书文件
+    </div>
+
+    <div class="warning-note" style="margin-bottom:12px;">
+      ⚠️ 请确认总报价 = 各明细加总
+    </div>
+
+    <h3 style="font-size:14px;color:#555;margin-bottom:8px;">📄 Markdown 预览</h3>
+    <pre id="preview">点击「生成标书」预览内容</pre>
+  </div>
+</div>
+
+<!-- Toast 提示 -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ==== 工具函数 ====
+function $(id) { return document.getElementById(id); }
+
+function showToast(msg, color='#34a853') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function toggleSection(el) {
+  const body = el.nextElementSibling;
+  const arrow = el.querySelector('.arrow');
+  if (!body || !arrow) return;
+  body.classList.toggle('hidden');
+  arrow.classList.toggle('collapsed');
+}
+
+function getVal(id) { return $(id) ? $(id).value.trim() : ''; }
+
+// ==== localStorage 草稿保存 ====
+const DRAFT_KEY = 'bid_form_draft';
+
+function saveDraft() {
+  const data = {};
+  document.querySelectorAll('#bid_form input, #bid_form textarea, #bid_form select').forEach(el => {
+    data[el.id] = el.value;
+  });
+  // Also handle fields not inside #bid_form (form-less layout)
+  document.querySelectorAll('input[id], textarea[id], select[id]').forEach(el => {
+    data[el.id] = el.value;
+  });
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+}
+
+function restoreDraft() {
+  const raw = localStorage.getItem(DRAFT_KEY);
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    Object.keys(data).forEach(id => {
+      const el = $(id);
+      if (el) el.value = data[id];
+    });
+  } catch(e) { /* ignore corrupt data */ }
+}
+
+// 自动每30秒存草稿
+let draftTimer = setInterval(saveDraft, 30000);
+
+// 页面关闭前也存一次
+window.addEventListener('beforeunload', saveDraft);
+
+// 日期自动填今天 + 恢复草稿
+document.addEventListener('DOMContentLoaded', () => {
+  const d = new Date();
+  if (!$('bid_date').value) {
+    $('bid_date').value = d.toISOString().split('T')[0];
+  }
+  restoreDraft();
+});
+
+// ==== 核心：生成标书 Markdown ====
+function generateBid() {
+  const pn = getVal('project_name');
+  if (!pn) { showToast('请填写项目名称！', '#e74c3c'); return; }
+  let bn = getVal('bidder_name');
+  if (!bn) { showToast('请填写投标人全称！', '#e74c3c'); return; }
+
+  // 脱敏处理
+  const anonymize = $('anonymize_mode') && $('anonymize_mode').checked;
+  const MASK = '______';
+  if (anonymize) {
+    bn = MASK;
+  }
+  const contactPerson = anonymize ? MASK : (getVal('contact_person') || MASK);
+  const contactPhone = anonymize ? MASK : (getVal('contact_phone') || MASK);
+  const legalPerson = getVal('legal_person') || MASK;
+  const coverLogo = anonymize ? MASK : (getVal('cover_logo_text') || bn);
+
+  let md = '';
+  const date = getVal('bid_date') || new Date().toISOString().split('T')[0];
+
+  // —— 封面 ——
+  const coverTitle = getVal('cover_title') || '投标文件';
+  md += '# ' + pn + '\n\n';
+  md += '## ' + coverTitle + '\n\n';
+  md += '**项目名称**：' + pn + '\n\n';
+  if (getVal('bid_no')) md += '**招标编号**：' + getVal('bid_no') + '\n\n';
+  md += '**投标人**：' + coverLogo + '\n\n';
+  md += '**日期**：' + date + '\n\n';
+  md += '---\n\n';
+
+  // —— 目录占位 ——
+  md += '<!-- TOC -->\n\n';
+  md += '---\n\n';
+
+  // —— 一、投标函 ——
+  const bidValidity = getVal('bid_validity') || '90';
+  md += '# 一、投标函\n\n';
+  md += '致：' + pn + '（招标人）\n\n';
+  md += '我方 ' + bn + '，在仔细阅读了本项目招标文件后，决定参加本项目的投标。\n\n';
+  md += '1. 我方愿意按照招标文件要求，以投标报价 **' + (getVal('bid_price') || '______') + '万元**，服务期限 **' + (getVal('service_period') || '______') + '** 提供本项目所需服务。\n\n';
+  md += '2. 我方承诺所提交的投标文件及有关资料内容完整、真实、准确。\n\n';
+  md += '3. 我方承诺一旦中标，将严格按照合同约定履行义务，保证服务质量。\n\n';
+  md += '4. 本投标函有效期：自开标之日起' + bidValidity + '个日历日。\n\n';
+  md += '投标人（盖章）：' + bn + '\n\n';
+  md += '法定代表人或授权代表（签字）：' + legalPerson + '\n\n';
+  md += '联系人：' + contactPerson + '\n\n';
+  md += '联系电话：' + contactPhone + '\n\n';
+  md += '日期：' + date + '\n\n';
+  md += '---\n\n';
+
+  // —— 二、法定代表人授权委托书 ——
+  md += '# 二、法定代表人授权委托书\n\n';
+  md += '本授权委托书声明：我 ' + legalPerson + ' 系 ' + bn + ' 的法定代表人，现授权委托 ' + contactPerson + ' 为我单位代理人，以本单位名义参加 ' + pn + ' 的投标活动。\n\n';
+  md += '代理人在开标、评标、合同谈判过程中所签署的一切文件和处理与之有关的一切事务，我均予以承认。\n\n';
+  md += '代理人无转委托权。\n\n';
+  md += '特此委托。\n\n';
+  md += '法定代表人（签字）：' + legalPerson + '\n\n';
+  md += '代理人（签字）：' + contactPerson + '\n\n';
+  md += '日期：' + date + '\n\n';
+  md += '---\n\n';
+
+  // —— 三、公司简介与资质 ——
+  md += '# 三、公司简介与资质\n\n';
+  if (getVal('company_desc')) {
+    md += getVal('company_desc') + '\n\n';
+  }
+
+  // 基本信息表
+  md += '| 项目 | 内容 |\n';
+  md += '|------|------|\n';
+  md += '| 公司全称 | ' + bn + ' |\n';
+  if (getVal('reg_capital')) md += '| 注册资金 | ' + getVal('reg_capital') + '万元 |\n';
+  if (getVal('found_year')) md += '| 成立时间 | ' + getVal('found_year') + '年 |\n';
+  if (getVal('staff_count')) md += '| 员工总数 | ' + getVal('staff_count') + '人 |\n';
+  md += '\n';
+
+  if (getVal('certificates')) {
+    md += '**资质证书**：\n\n';
+    const certs = getVal('certificates').split('\n').filter(s => s.trim());
+    certs.forEach((c, i) => { md += (i+1) + '. ' + c.trim() + '\n'; });
+    md += '\n';
+  }
+  md += '---\n\n';
+
+  // —— 四、技术/服务方案（根据项目类型分支） ——
+  const ptype = getVal('project_type');
+  if (ptype === '货物采购') {
+    md += '# 四、项目理解与技术要求\n\n';
+    md += '## 4.1 技术要求响应\n\n';
+    md += (getVal('service_desc') || '（此处填写对技术要求的响应）') + '\n\n';
+    md += '## 4.2 货物配置清单\n\n';
+    md += (getVal('challenges') || '（此处填写货物配置清单）') + '\n\n';
+    md += '## 4.3 质量保证措施\n\n';
+    md += (getVal('guarantee') || '（此处填写质量保证措施）') + '\n\n';
+    md += '## 4.4 交货与验收方案\n\n';
+    md += (getVal('staff_plan') || '（此处填写交货与验收方案）') + '\n\n';
+  } else if (ptype === 'IT服务') {
+    md += '# 四、项目理解与技术方案\n\n';
+    md += '## 4.1 技术方案概述\n\n';
+    md += (getVal('service_desc') || '（此处填写技术方案概述）') + '\n\n';
+    md += '## 4.2 系统架构设计\n\n';
+    md += (getVal('challenges') || '（此处填写系统架构设计）') + '\n\n';
+    md += '## 4.3 实施方案\n\n';
+    md += (getVal('guarantee') || '（此处填写实施方案）') + '\n\n';
+    md += '## 4.4 运维保障方案\n\n';
+    md += (getVal('staff_plan') || '（此处填写运维保障方案）') + '\n\n';
+  } else {
+    // 人力外包 / 物业服务 / 其他 → 保持现有模板
+    md += '# 四、项目理解与服务方案\n\n';
+    md += '## 4.1 项目理解\n\n';
+    md += (getVal('service_desc') || '（此处填写对本项目的理解和总体认识）') + '\n\n';
+    md += '## 4.2 项目重难点分析及对策\n\n';
+    md += (getVal('challenges') || '（此处分析项目重难点及对策）') + '\n\n';
+    md += '## 4.3 服务保障措施\n\n';
+    md += (getVal('guarantee') || '（此处填写质量/安全/应急保障措施）') + '\n\n';
+    md += '## 4.4 人员配置方案\n\n';
+    md += (getVal('staff_plan') || '（此处填写拟投入人员配置方案）') + '\n\n';
+  }
+  md += '---\n\n';
+
+  // —— 五、类似项目业绩 ——
+  md += '# 五、类似项目业绩\n\n';
+  if (getVal('projects')) {
+    md += '| 项目名称 | 甲方单位 | 合同金额 | 年份 |\n';
+    md += '|----------|----------|----------|------|\n';
+    const projs = getVal('projects').split('\n').filter(s => s.trim());
+    projs.forEach(p => {
+      const parts = p.split('|').map(s => s.trim());
+      while (parts.length < 4) parts.push('______');
+      md += '| ' + parts.slice(0,4).join(' | ') + ' |\n';
+    });
+  } else {
+    md += '（此处填写类似项目业绩）\n\n';
+  }
+  md += '\n---\n\n';
+
+  // —— 六、报价说明 ——
+  md += '# 六、报价说明\n\n';
+  md += '## 6.1 总报价\n\n';
+  md += '本项目投标总报价：**' + (getVal('bid_price') || '______') + '万元**\n\n';
+
+  if (getVal('price_detail')) {
+    md += '## 6.2 报价明细\n\n';
+    md += '| 项目 | 金额（万元） | 说明 |\n';
+    md += '|------|-------------|------|\n';
+    const prices = getVal('price_detail').split('\n').filter(s => s.trim());
+    prices.forEach(p => {
+      const parts = p.split('|').map(s => s.trim());
+      while (parts.length < 3) parts.push('');
+      md += '| ' + parts.slice(0,3).join(' | ') + ' |\n';
+    });
+    md += '\n';
+  }
+
+  if (getVal('discount')) {
+    md += '## 6.3 优惠承诺\n\n';
+    md += getVal('discount') + '\n\n';
+  }
+  md += '---\n\n';
+
+  // —— 七、服务承诺 ——
+  md += '# 七、服务承诺\n\n';
+  md += (getVal('commitments') || '（此处填写服务承诺内容）') + '\n\n';
+  md += '---\n\n';
+
+  // —— 附件说明 ——
+  md += '# 八、附件\n\n';
+  md += '1. 营业执照副本复印件\n';
+  md += '2. 相关资质证书复印件\n';
+  md += '3. 类似项目合同复印件\n';
+  md += '4. 其他需要提交的材料\n\n';
+
+  // 存储预览
+  window._bidMD = md;
+  document.getElementById('preview').textContent = md;
+  showToast('✅ 标书生成完成！可下载或复制');
+}
+
+// —— 下载 Markdown ——
+function downloadMarkdown() {
+  if (!window._bidMD) { showToast('请先生成标书！', '#e74c3c'); return; }
+  const pn = getVal('project_name') || '投标文件';
+  const blob = new Blob([window._bidMD], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = pn.replace(/[\\/:*?"<>|]/g, '_') + '_投标文件.md';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📥 下载完成！');
+}
+
+// —— 复制内容 ——
+function copyContent() {
+  if (!window._bidMD) { showToast('请先生成标书！', '#e74c3c'); return; }
+  navigator.clipboard.writeText(window._bidMD)
+    .then(() => showToast('📋 已复制到剪贴板'))
+    .catch(() => showToast('复制失败，请手动选择复制', '#e74c3c'));
+}
+
+// —— 清空 ——
+function clearAll() {
+  if (!confirm('确定要清空所有字段吗？')) return;
+  document.querySelectorAll('input, textarea').forEach(el => {
+    if (el.type !== 'date') el.value = '';
+  });
+  // 恢复投标有效期默认值
+  $('bid_validity').value = '90';
+  window._bidMD = '';
+  document.getElementById('preview').textContent = '点击「生成标书」预览内容';
+  // 清除 localStorage 草稿
+  localStorage.removeItem(DRAFT_KEY);
+  showToast('已清空');
+}
+</script>
+</body>
+</html>
