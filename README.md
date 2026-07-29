@@ -67,7 +67,10 @@ bid desense 标书.docx
 bid review 招标文件.pdf -o 审标报告.md
 
 # 审标 + 查覆盖（指定投标书）
-bid review 招标文件.pdf --bid 投标书.md -o 审标报告.md
+bid review 招标文件.pdf --bid-file 投标书.md -o 审标报告.md
+
+# 审标输出JSON（适合CI自动化）
+bid review 招标文件.pdf -o 审标报告.json
 ```
 
 > 💡 还在用 `git clone + cd scripts + python xxx.py` 五步大法？装完 `bid` 命令全局可用，零门槛。

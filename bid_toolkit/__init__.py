@@ -106,9 +106,9 @@ def cmd_review(args):
 
     # Layer 3: 反向覆盖检查（需指定投标书）
     coverage_result = None
-    if args.bid:
+    if args.bid_file:
         print(f"  Layer 3: 反向覆盖检查（vs 投标书）...")
-        coverage_result = reverse_check.reverse_coverage_check(result, args.bid)
+        coverage_result = reverse_check.reverse_coverage_check(result, args.bid_file)
         print(f"  ✅ 完成: {coverage_result['coverage_rate']}")
 
     # 输出报告
@@ -117,23 +117,49 @@ def cmd_review(args):
     if coverage_result:
         reverse_check.print_coverage_report(coverage_result)
 
-    # 导出Markdown
+    # 导出报告
     if args.output:
-        md = rpt.format_checklist_md(result)
-        with open(args.output, 'w', encoding='utf-8') as f:
-            f.write(md)
-        print(f"📁 完整报告已导出: {args.output}")
-
-        if coverage_result:
-            cov_path = args.output.replace('.md', '_覆盖检查.md')
+        is_json = args.output.endswith('.json')
+        if is_json:
+            # JSON 输出
+            fatals_list = [{'keyword': h.keyword, 'category': h.category, 'line_num': h.line_num,
+                           'context': h.context[:80], 'llm_label': h.llm_label, 'llm_reason': h.llm_reason}
+                          for h in result.hits if h.llm_label == 'fatal']
+            warns_list = [{'keyword': h.keyword, 'category': h.category, 'line_num': h.line_num,
+                          'context': h.context[:80], 'llm_label': h.llm_label, 'llm_reason': h.llm_reason}
+                         for h in result.hits if h.llm_label == 'warn']
+            json_out = {
+                'file': args.input,
+                'total_hits': len(result.hits),
+                'summary': {
+                    'fatal': len([h for h in result.hits if h.llm_label == 'fatal']),
+                    'warn': len([h for h in result.hits if h.llm_label == 'warn']),
+                    'info': len([h for h in result.hits if h.llm_label == 'info']),
+                },
+                'fatals': fatals_list,
+                'warns': warns_list,
+                'coverage': coverage_result,
+            }
             import json
-            with open(cov_path, 'w', encoding='utf-8') as f:
-                f.write(f"# 反向覆盖检查报告\n\n")
-                f.write(f"总风险项: {coverage_result['total']} | 已回应: {coverage_result['covered']} | 未回应: {coverage_result['missing']}\n\n")
-                for item in coverage_result['items']:
-                    icon = '✅' if item['status'] == 'covered' else '❌'
-                    f.write(f"- {icon} `{item['keyword']}` L{item['line_num']} — {item['suggestion']}\n")
-            print(f"📁 覆盖检查已导出: {cov_path}")
+            with open(args.output, 'w', encoding='utf-8') as f:
+                json.dump(json_out, f, ensure_ascii=False, indent=2)
+            print(f"📁 JSON报告已导出: {args.output} ({len(fatals_list)}fatal/{len(warns_list)}warn)")
+        else:
+            # Markdown 输出
+            md = rpt.format_checklist_md(result)
+            with open(args.output, 'w', encoding='utf-8') as f:
+                f.write(md)
+            print(f"📁 完整报告已导出: {args.output}")
+
+            if coverage_result:
+                cov_path = args.output.replace('.md', '_覆盖检查.md') if not is_json else args.output.replace('.json', '_覆盖检查.json')
+                with open(cov_path, 'w', encoding='utf-8') as f:
+                    f.write(f"# 反向覆盖检查报告\n\n")
+                    f.write(f"总风险项: {coverage_result['total']} | 已回应: {coverage_result['covered']} | 未回应: {coverage_result['missing']}\n\n")
+                    for item in coverage_result['items']:
+                        icon = '✅' if item['status'] == 'covered' else '❌'
+                        f.write(f"- {icon} `{item['keyword']}` L{item['line_num']} — {item['suggestion']}\n")
+                print(f"📁 覆盖检查已导出: {cov_path}")
 
 
 def cmd_desense(args):
@@ -184,8 +210,8 @@ def main():
     # review
     p = sub.add_parser("review", help="招标文件风险扫描（三层审标管线）")
     p.add_argument("input", help="输入的招标文件路径（PDF/DOCX/MD）")
-    p.add_argument("--bid", "-b", help="投标书路径（可选，开启Layer 3反向覆盖检查）")
-    p.add_argument("--output", "-o", help="导出审标报告到Markdown文件")
+    p.add_argument("--bid-file", "-b", help="投标书路径（可选，开启Layer 3反向覆盖检查）")
+    p.add_argument("--output", "-o", help="导出审标报告到文件（.md / .json）")
     p.add_argument("--llm", action="store_true", help="启用LLM上下文判断（Layer 2）")
 
     # rfp

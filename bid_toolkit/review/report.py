@@ -147,6 +147,22 @@ def format_checklist_md(result):
     lines.append(f"> 审标报告由 `bid review` 自动生成 — 确认所有 🔴 项已处理后再投标")
     lines.append(f"")
 
+    # ====== 原文速查表 ======
+    lines.append(f"---")
+    lines.append(f"## 📑 风险项原文位置速查表")
+    lines.append(f"")
+    lines.append(f"按行号排序，方便在招标文件中精确定位。")
+    lines.append(f"")
+    lines.append(f"| 行号 | 分类 | 完整命中原文 |")
+    lines.append(f"|------|------|-------------|")
+    for h in sorted(result.hits, key=lambda x: x.line_num)[:50]:
+        cat_short = _category_label(h.category)
+        raw = h.context.replace('\n', ' ')[:80]
+        lines.append(f"| L{h.line_num} | {cat_short} | `{h.keyword}` {raw} |")
+    if len(result.hits) > 50:
+        lines.append(f"| ... | *共 {len(result.hits)} 项，仅展示前50行* | |")
+    lines.append(f"")
+
     return '\n'.join(lines)
 
 

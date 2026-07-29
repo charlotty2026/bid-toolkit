@@ -377,7 +377,7 @@ def _llm_judge_rules(result):
         if h.category in ('primary', 'bid_types'):
             # 一级判决词 + 行业特有
             if any(w in ctx for w in ['必须', '应当', '须提供']) and \
-               not any(w in ctx for w in ['否则', '视为', '按...处理', '按废标', '予以否决', '拒绝', '将']):
+               not any(w in ctx for w in ['否则', '视为', '按废标处理', '按无效处理', '按否决处理', '予以否决', '拒绝', '将']):
                 h.llm_label = 'warn'
                 h.llm_reason = '属必要条件但未带否决后果'
             elif h.keyword in ('不接受联合体', '不接受联合体投标'):
@@ -415,8 +415,13 @@ def _llm_judge_rules(result):
             h.llm_reason = '商务门槛，需提前确认能否满足'
 
         elif h.category in ('emphasis_marks',):
-            h.llm_label = 'fatal'
-            h.llm_reason = '实质性响应参数，不响应即否决'
+            # 强调标识 — 如果上下文是参考/详见/例如，降为warn
+            if any(w in ctx for w in ['参考', '详见', '例如', '如']):
+                h.llm_label = 'warn'
+                h.llm_reason = '强调标识出现在参考/示例说明中，非实质性响应'
+            else:
+                h.llm_label = 'fatal'
+                h.llm_reason = '实质性响应参数，不响应即否决'
 
         else:
             # 兜底
