@@ -171,14 +171,25 @@ def cmd_desense(args):
     mod.print_report(report)
 
 
+def cmd_watermark(args):
+    """Word文档添加文字水印"""
+    mod = _load_script("watermark.py")
+    print(f"💧 添加水印: {args.input} → {args.output}")
+    mod.add_watermark(args.input, args.output,
+                      text=args.text, font=args.font,
+                      color=args.color, opacity=args.opacity)
+    print(f"✅ 水印 \"{args.text}\" 已添加到 {args.output}")
+
+
 def cmd_list(args=None):
     """列出所有可用工具"""
     tools = [
-        ("engine",  "Markdown转Word标书排版",  "bid engine input.md -o output.docx"),
-        ("check",   "标书格式自检 + 评分项覆盖", "bid check input.docx --coverage"),
-        ("review",  "招标文件风险扫描（三层审标）", "bid review 招标文件.pdf -o report.md"),
-        ("rfp",     "招标文件生成器",          "bid rfp --type services --project XX项目"),
-        ("desense", "敏感信息脱敏扫描",        "bid desense input.docx"),
+        ("engine",   "Markdown转Word标书排版",   "bid engine input.md -o output.docx"),
+        ("check",    "标书格式自检 + 评分项覆盖", "bid check input.docx --coverage"),
+        ("review",   "招标文件风险扫描（三层审标）", "bid review 招标文件.pdf -o report.md"),
+        ("rfp",      "招标文件生成器",           "bid rfp --type services --project XX项目"),
+        ("desense",  "敏感信息脱敏扫描",         "bid desense input.docx"),
+        ("watermark","Word文档添加文字水印",      "bid watermark input.docx output.docx -t 仅供参考"),
     ]
     print("📋 bid-toolkit 工具清单\n")
     for name, desc, example in tools:
@@ -226,6 +237,15 @@ def main():
     p = sub.add_parser("desense", help="敏感信息脱敏扫描")
     p.add_argument("file", help="输入文件路径")
 
+    # watermark
+    p = sub.add_parser("watermark", help="Word文档添加文字水印")
+    p.add_argument("input", help="输入 Word 文件路径")
+    p.add_argument("output", help="输出 Word 文件路径")
+    p.add_argument("-t", "--text", default="仅供参考", help="水印文字 (默认: 仅供参考)")
+    p.add_argument("-f", "--font", default="微软雅黑", help="字体 (默认: 微软雅黑)")
+    p.add_argument("-c", "--color", default="#808080", help="颜色十六进制 (默认: #808080)")
+    p.add_argument("-o", "--opacity", default="0.5", help="透明度 0-1 (默认: 0.5)")
+
     # list
     sub.add_parser("list", help="列出所有可用工具")
 
@@ -241,6 +261,8 @@ def main():
         cmd_rfp(args)
     elif args.command == "desense":
         cmd_desense(args)
+    elif args.command == "watermark":
+        cmd_watermark(args)
     elif args.command == "list":
         cmd_list()
     else:
