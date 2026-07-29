@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bid-toolkit"
-version = "3.5.0"
-description = "招投标全流程工具链——Markdown转Word、格式检测、RFP生成、脱敏扫描"
+version = "3.6.0"
+description = "招投标全流程工具链——Markdown转Word、格式检测、RFP生成、脱敏扫描、审标风险扫描"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
@@ -41,7 +41,7 @@ bid = "bid_toolkit:main"
 include = ["bid_toolkit", "bid_toolkit.*"]
 
 [tool.setuptools.package-data]
-bid_toolkit = ["scripts/*.py", "rules/*.json"]
+bid_toolkit = ["scripts/*.py", "rules/*.json", "review/*.json"]
 
 [tool.setuptools]
 zip-safe = false

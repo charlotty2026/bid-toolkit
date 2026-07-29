@@ -92,6 +92,50 @@ def cmd_rfp(args):
     mod.main()
 
 
+def cmd_review(args):
+    """招标文件风险扫描 — 三层审标管线"""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from bid_toolkit.review import scanner, report as rpt, reverse_check
+
+    print(f"📋 审标扫描: {args.input}")
+    print(f"{'='*60}")
+    print(f"  Layer 1: 判词库逐行扫描 ...")
+    result = scanner.scan_tender(args.input, with_llm=args.llm)
+    print(f"  ✅ 完成: {len(result.hits)} 处命中")
+    print()
+
+    # Layer 3: 反向覆盖检查（需指定投标书）
+    coverage_result = None
+    if args.bid:
+        print(f"  Layer 3: 反向覆盖检查（vs 投标书）...")
+        coverage_result = reverse_check.reverse_coverage_check(result, args.bid)
+        print(f"  ✅ 完成: {coverage_result['coverage_rate']}")
+
+    # 输出报告
+    rpt.format_report(result)
+
+    if coverage_result:
+        reverse_check.print_coverage_report(coverage_result)
+
+    # 导出Markdown
+    if args.output:
+        md = rpt.format_checklist_md(result)
+        with open(args.output, 'w', encoding='utf-8') as f:
+            f.write(md)
+        print(f"📁 完整报告已导出: {args.output}")
+
+        if coverage_result:
+            cov_path = args.output.replace('.md', '_覆盖检查.md')
+            import json
+            with open(cov_path, 'w', encoding='utf-8') as f:
+                f.write(f"# 反向覆盖检查报告\n\n")
+                f.write(f"总风险项: {coverage_result['total']} | 已回应: {coverage_result['covered']} | 未回应: {coverage_result['missing']}\n\n")
+                for item in coverage_result['items']:
+                    icon = '✅' if item['status'] == 'covered' else '❌'
+                    f.write(f"- {icon} `{item['keyword']}` L{item['line_num']} — {item['suggestion']}\n")
+            print(f"📁 覆盖检查已导出: {cov_path}")
+
+
 def cmd_desense(args):
     """敏感信息脱敏扫描"""
     mod = _load_script("desensitization_scan.py")
@@ -106,6 +150,7 @@ def cmd_list(args=None):
     tools = [
         ("engine",  "Markdown转Word标书排版",  "bid engine input.md -o output.docx"),
         ("check",   "标书格式自检 + 评分项覆盖", "bid check input.docx --coverage"),
+        ("review",  "招标文件风险扫描（三层审标）", "bid review 招标文件.pdf -o report.md"),
         ("rfp",     "招标文件生成器",          "bid rfp --type services --project XX项目"),
         ("desense", "敏感信息脱敏扫描",        "bid desense input.docx"),
     ]
@@ -136,6 +181,13 @@ def main():
     p.add_argument("--coverage-type", "-t", choices=["工程", "服务", "货物"], help="标书类型（不指定则自动识别）")
     p.add_argument("--coverage-output", help="覆盖检查报告导出路径（.txt / .md）")
 
+    # review
+    p = sub.add_parser("review", help="招标文件风险扫描（三层审标管线）")
+    p.add_argument("input", help="输入的招标文件路径（PDF/DOCX/MD）")
+    p.add_argument("--bid", "-b", help="投标书路径（可选，开启Layer 3反向覆盖检查）")
+    p.add_argument("--output", "-o", help="导出审标报告到Markdown文件")
+    p.add_argument("--llm", action="store_true", help="启用LLM上下文判断（Layer 2）")
+
     # rfp
     p = sub.add_parser("rfp", help="招标文件生成")
     p.add_argument("--type", choices=["services", "goods", "engineering"], help="项目类型")
@@ -157,6 +209,8 @@ def main():
         cmd_engine(args)
     elif args.command == "check":
         cmd_check(args)
+    elif args.command == "review":
+        cmd_review(args)
     elif args.command == "rfp":
         cmd_rfp(args)
     elif args.command == "desense":
