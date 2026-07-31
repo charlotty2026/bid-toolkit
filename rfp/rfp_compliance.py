@@ -404,6 +404,63 @@ def check_legal_basis(text):
     return results
 
 
+def check_multi_package_rule(text):
+    """检查多采购包项目的"兼投不兼中"规则完整性
+
+    依据：财政部令第87号第44条（合格投标人不足3家不得评标）
+    逻辑：
+    1. 先检测是否多包项目（采购包/包组/分包/标段/多个包）
+    2. 多包项目必须明确"兼投不兼中/兼投兼中"规则，否则提示
+    3. 单包项目自动pass（不适用）
+    """
+    results = []
+
+    # 多包项目信号词
+    multi_pkg_patterns = [
+        r"采购包", r"包组", r"分包", r"标段", r"多个包", r"兼投", r"兼中",
+        r"分[0-9一二三四五六七八九十]+个?[包组]", r"第[0-9一二三四五六七八九十]+包",
+    ]
+    is_multi = any(re.search(p, text) for p in multi_pkg_patterns)
+
+    # 兼投规则关键词
+    rule_patterns = [
+        r"兼投不兼中", r"兼投兼中", r"不兼中", r"最多只能中[一二三四五六七八九十0-9]*个",
+        r"最多中[一二三四五六七八九十0-9]*个", r"兼投.{0,20}不兼中",
+        # "不涉及"须与兼投/采购包相关才视为豁免（避免"不涉及联合体"误判）
+        r"兼投.{0,30}不涉及", r"采购包.{0,30}不涉及.{0,10}兼", r"不涉及.{0,5}兼投",
+    ]
+    has_rule = any(re.search(p, text) for p in rule_patterns)
+
+    if not is_multi:
+        results.append({
+            "type": "兼投不兼中规则",
+            "severity": "pass",
+            "message": "✅ 单包项目，兼投不兼中规则不适用",
+        })
+    elif has_rule:
+        results.append({
+            "type": "兼投不兼中规则",
+            "severity": "pass",
+            "message": "✅ 已明确兼投规则（兼投不兼中/兼投兼中）",
+        })
+    else:
+        results.append({
+            "type": "兼投不兼中规则",
+            "severity": "fail",
+            "message": "❌ 多采购包项目未明确兼投规则",
+            "suggestion": "请补充「兼投不兼中」或「兼投兼中」条款，并明确中标包确定规则（按包号/按得分/按成本）",
+        })
+
+        # 额外提示：有效竞争计算（87号令44条）
+        results.append({
+            "type": "兼投不兼中规则",
+            "severity": "warn",
+            "message": "⚠️ 多包项目需确保排除前序中标者后每包仍≥3家合格投标人",
+            "suggestion": "按财政部令第87号第44条，提前核算所需供应商数量，避免某包合格投标人不足3家导致无法评标",
+        })
+    return results
+
+
 def run_all_checks(text, project_type="services"):
     """运行所有检查"""
     report = {
@@ -419,6 +476,7 @@ def run_all_checks(text, project_type="services"):
             "time_nodes": check_time_nodes(text),
             "qualification": check_qualification(text),
             "legal_basis": check_legal_basis(text),
+            "multi_package": check_multi_package_rule(text),
         },
     }
 
