@@ -181,6 +181,21 @@ def cmd_watermark(args):
     print(f"✅ 水印 \"{args.text}\" 已添加到 {args.output}")
 
 
+def cmd_materials(args):
+    """标书素材库管家 — 自动分类整理 + 必备材料清单状态"""
+    mod = _load_script("bid_materials.py")
+    sys.argv = ["bid_materials.py", args.action, args.dir]
+    if getattr(args, "min_conf", None) is not None:
+        sys.argv.extend(["--min-conf", str(args.min_conf)])
+    if getattr(args, "force", False):
+        sys.argv.append("--force")
+    if getattr(args, "verbose", False):
+        sys.argv.append("-v")
+    if getattr(args, "llm", False):
+        sys.argv.append("--llm")
+    mod.main()
+
+
 def cmd_list(args=None):
     """列出所有可用工具"""
     tools = [
@@ -190,6 +205,7 @@ def cmd_list(args=None):
         ("rfp",      "招标文件生成器",           "bid rfp --type services --project XX项目"),
         ("desense",  "敏感信息脱敏扫描",         "bid desense input.docx"),
         ("watermark","Word文档添加文字水印",      "bid watermark input.docx output.docx -t 仅供参考"),
+        ("materials","标书素材库管家（自动分类整理+材料清单）", "bid materials analyze 素材库目录"),
     ]
     print("📋 bid-toolkit 工具清单\n")
     for name, desc, example in tools:
@@ -246,6 +262,16 @@ def main():
     p.add_argument("-c", "--color", default="#808080", help="颜色十六进制 (默认: #808080)")
     p.add_argument("-o", "--opacity", default="0.5", help="透明度 0-1 (默认: 0.5)")
 
+    # materials
+    p = sub.add_parser("materials", help="标书素材库管家（自动分类整理+材料清单）")
+    p.add_argument("action", choices=["init", "analyze", "apply", "status", "learn"],
+                   help="操作: init初始化 / analyze扫描 / apply执行 / status状态 / learn学习")
+    p.add_argument("dir", nargs="?", default=".", help="素材库目录 (默认: 当前目录)")
+    p.add_argument("--min-conf", type=float, default=None, help="置信度阈值 (默认0.7)")
+    p.add_argument("--force", action="store_true", help="apply时跳过needs_review强制执行")
+    p.add_argument("-v", "--verbose", action="store_true", help="apply时显示移动明细")
+    p.add_argument("--llm", action="store_true", help="learn时开启AI建议")
+
     # list
     sub.add_parser("list", help="列出所有可用工具")
 
@@ -263,6 +289,8 @@ def main():
         cmd_desense(args)
     elif args.command == "watermark":
         cmd_watermark(args)
+    elif args.command == "materials":
+        cmd_materials(args)
     elif args.command == "list":
         cmd_list()
     else:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bid-toolkit"
-version = "3.6.0"
+version = "3.9.0"
 description = "招投标全流程工具链——Markdown转Word、格式检测、RFP生成、脱敏扫描、审标风险扫描"
 readme = "README.md"
 license = {text = "MIT"}
