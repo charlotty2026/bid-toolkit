@@ -196,6 +196,16 @@ def cmd_materials(args):
     mod.main()
 
 
+def cmd_gui(args):
+    """启动桌面图形界面（Gradio + pywebview）"""
+    try:
+        from bid_toolkit.gui import launch
+        launch(port=args.port, browser_only=args.browser)
+    except ImportError:
+        print("缺少桌面端依赖: gradio")
+        print('请运行: pip install "bid-toolkit[desktop]"')
+        sys.exit(1)
+
 def cmd_list(args=None):
     """列出所有可用工具"""
     tools = [
@@ -206,6 +216,7 @@ def cmd_list(args=None):
         ("desense",  "敏感信息脱敏扫描",         "bid desense input.docx"),
         ("watermark","Word文档添加文字水印",      "bid watermark input.docx output.docx -t 仅供参考"),
         ("materials","标书素材库管家（自动分类整理+材料清单）", "bid materials analyze 素材库目录"),
+        ("gui",      "启动桌面图形界面",           "bid gui"),
     ]
     print("📋 bid-toolkit 工具清单\n")
     for name, desc, example in tools:
@@ -275,6 +286,11 @@ def main():
     # list
     sub.add_parser("list", help="列出所有可用工具")
 
+    # gui
+    p = sub.add_parser("gui", help="启动桌面图形界面")
+    p.add_argument("--port", type=int, default=7860, help="端口号 (默认: 7860)")
+    p.add_argument("--browser", action="store_true", help="浏览器模式（不启动桌面窗口）")
+
     args = parser.parse_args()
 
     if args.command == "engine":
@@ -293,6 +309,8 @@ def main():
         cmd_materials(args)
     elif args.command == "list":
         cmd_list()
+    elif args.command == "gui":
+        cmd_gui(args)
     else:
         parser.print_help()
 
