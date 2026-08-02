@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-标书自动化引擎 v3.2
-一行命令完成：Markdown → 全角半角修复 → Word生成 → 格式自检
+标书自动化引擎 v3.6
+一行命令完成：Markdown → 全角半角修复 → Word生成 → 格式自检 → Mermaid图表 → 企业资料注入
 
 用法:
   python bid_engine.py 标书.md                    # 生成Word
@@ -14,9 +14,11 @@
   python bid_engine.py 标书.md --template enterprise  # 使用企业投标模板
   python bid_engine.py 标书.md --template engineering # 使用工程类模板
   python bid_engine.py 标书.md --config my.yaml  # 使用自定义配置
+  python bid_engine.py 标书.md --profile          # 自动注入企业资料库信息
+  python bid_engine.py 标书.md --mermaid-api      # 使用mermaid.ink API渲染图表(不依赖mmdc)
 """
 
-import os, sys, re, argparse, json
+import os, sys, re, argparse, json, urllib.request, urllib.error, base64
 from datetime import datetime
 from pathlib import Path
 
@@ -52,7 +54,10 @@ DEFAULT_CONFIG = {
     'page': {'margin_top': 2.54, 'margin_bottom': 2.54, 'margin_left': 2.00, 'margin_right': 2.00},
     'anonymous': {'enabled': False, 'replace_words': ['我公司', '本公司'], 'replace_with': '投标人', 'company_names': [], 'company_addresses': []},
     'quality': {'check_placeholder': True, 'check_punctuation': True, 'check_forbidden_words': True, 'forbidden_words': ['保证中标', '100%成功率', '最优价格', '独家技术', '唯一选择', '最高质量']},
+    'mermaid': {'api_fallback': False, 'api_url': 'https://mermaid.ink/img/'},
+    'profile': {'enabled': False, 'dir': ''},
 }
+
 
 def load_config(config_path=None, template_name=None):
     """加载配置文件，优先级：config_path > template > 自动查找config.yaml > 默认"""
@@ -88,6 +93,7 @@ def load_config(config_path=None, template_name=None):
 
     return config
 
+
 def _deep_merge(base, override):
     """递归合并字典"""
     for k, v in override.items():
@@ -95,6 +101,7 @@ def _deep_merge(base, override):
             _deep_merge(base[k], v)
         else:
             base[k] = v
+
 
 def build_specs(config):
     """从配置构建内部规格字典"""
@@ -141,64 +148,41 @@ def build_specs(config):
 
 # ===== 下划线/占位符保留逻辑 =====
 UNDERLINE_PATTERNS = [
-    # 致：_________（招标人） → 保留下划线和括号说明
-    (r'(致[：:]\s*)(_{3,})(\s*（[^）]+）)', r'\1{value}\3'),
-    # 根据：_________（招标文件编号）
-    (r'(根据[：:]\s*)(_{3,})(\s*（[^）]+）)', r'\1{value}\3'),
-    # 项目名称：_________
-    (r'(项目名称[：:]\s*)(_{3,})', r'\1{value}'),
-    # 通用：文字：_____（说明）
-    (r'([：:]\s*)(_{3,})(\s*（[^）]+）)', r'\1{value}\3'),
-    # 通用：文字：_____（无括号说明）
-    (r'([：:]\s*)(_{3,})', r'\1{value}'),
-    # 括号说明保留：（招标人）（供应商）等
-    (r'（(招标人|投标人|供应商|采购人|代理机构|甲方|乙方|丙方)）', r'（\1）'),
+    (r'(致[：:]\\s*)(_{3,})(\\s*（[^）]+）)', r'\\1{value}\\3'),
+    (r'(根据[：:]\\s*)(_{3,})(\\s*（[^）]+）)', r'\\1{value}\\3'),
+    (r'(项目名称[：:]\\s*)(_{3,})', r'\\1{value}'),
+    (r'([：:]\\s*)(_{3,})(\\s*（[^）]+）)', r'\\1{value}\\3'),
+    (r'([：:]\\s*)(_{3,})', r'\\1{value}'),
+    (r'（(招标人|投标人|供应商|采购人|代理机构|甲方|乙方|丙方)）', r'（\\1）'),
 ]
 
+
 def preserve_underlines(text, replacements=None):
-    """
-    保留下划线占位符的格式，同时支持填入实际值。
-    
-    处理逻辑：
-    1. 识别 "致：_________（招标人）" 这类模式
-    2. 保留下划线和括号说明
-    3. 如果提供了replacements字典，将下划线替换为实际值
-    4. 如果没提供，保留下划线原样输出
-    
-    replacements 示例:
-    {
-        "致：": "致：上海交通大学",
-        "项目名称：": "项目名称：信息化系统建设",
-    }
-    """
+    """保留下划线占位符的格式，同时支持填入实际值。"""
     if not replacements:
         return text
-    
-    lines = text.split('\n')
+    lines = text.split('\\n')
     result = []
     for line in lines:
         for pattern, template in UNDERLINE_PATTERNS:
             match = re.search(pattern, line)
             if match:
-                # 找到匹配的下划线模式
                 for key, value in replacements.items():
                     if key in line:
-                        # 替换下划线部分，保留下划线后的括号说明
                         line = re.sub(
-                            r'(' + re.escape(key) + r'\s*)(_{3,})(\s*（[^）]+）)',
+                            r'(' + re.escape(key) + r'\\s*)(_{3,})(\\s*（[^）]+）)',
                             lambda m: m.group(1) + value + m.group(3),
                             line
                         )
-                        # 无括号说明的情况
                         if '（' not in line:
                             line = re.sub(
-                                r'(' + re.escape(key) + r'\s*)(_{3,})',
+                                r'(' + re.escape(key) + r'\\s*)(_{3,})',
                                 lambda m: m.group(1) + value,
                                 line
                             )
                         break
         result.append(line)
-    return '\n'.join(result)
+    return '\\n'.join(result)
 
 
 # ===== 文本格式化工具 =====
@@ -217,6 +201,7 @@ def set_run_font(run, font_name='宋体', size=12, bold=False):
     for attr in ['w:asciiTheme', 'w:hAnsiTheme', 'w:eastAsiaTheme']:
         try: del rFonts.attrib[qn(attr)]
         except KeyError: pass
+
 
 def init_doc_styles(doc, heading_spec, body_spec):
     try:
@@ -242,17 +227,19 @@ def init_doc_styles(doc, heading_spec, body_spec):
             rFonts.set(qn('w:eastAsia'), spec['name'])
         except KeyError: pass
 
+
 # ===== 全角半角检测 =====
 HALF_TO_FULL = {
     ',': '，', '.': '。', '!': '！', '?': '？', ':': '：', ';': '；',
     '(': '（', ')': '）', '[': '【', ']': '】', '<': '《', '>': '》',
-    '\"': '\"', "'": "'", '~': '～', '-': '—',
+    '\\\"': '\\\"', "'": "'", '~': '～', '-': '—',
 }
 FULLWIDTH_TRANS = str.maketrans(
     '０１２３４５６７８９ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ'
     'ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ',
     '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 )
+
 
 def fix_punctuation(text):
     """全角半角自动修复，跳过编号和小数中的点号"""
@@ -261,7 +248,6 @@ def fix_punctuation(text):
     in_cn = True
     changes = 0
     for i, ch in enumerate(fixed):
-        # 点号特殊处理：前后都是数字时不替换（编号1.1、小数3.14等）
         if ch == '.' and i > 0 and i < len(fixed) - 1:
             prev_ch = fixed[i - 1]
             next_ch = fixed[i + 1]
@@ -273,21 +259,23 @@ def fix_punctuation(text):
             changes += 1
         else:
             result.append(ch)
-        if '\u4e00' <= ch <= '\u9fff' or '\u3000' <= ch <= '\u303f': in_cn = True
+        if '\\u4e00' <= ch <= '\\u9fff' or '\\u3000' <= ch <= '\\u303f': in_cn = True
         elif ch.isascii() and ch.isalpha(): in_cn = False
     return ''.join(result), changes
 
+
 def scan_punctuation(text):
     issues = []
-    for i, line in enumerate(text.split('\n')):
+    for i, line in enumerate(text.split('\\n')):
         for half, full in HALF_TO_FULL.items():
-            for m in re.finditer(rf'[\u4e00-\u9fff]{re.escape(half)}[\u4e00-\u9fff]', line):
+            for m in re.finditer(rf'[\\u4e00-\\u9fff]{re.escape(half)}[\\u4e00-\\u9fff]', line):
                 issues.append({'line': i+1, 'type': '半角标点混入中文', 'char': half, 'should_be': full,
                     'context': line[max(0,m.start()-8):m.end()+8]})
-        for m in re.finditer(r'[\uff10-\uff19\uff21-\uff3a\uff41-\uff5a]+', line):
+        for m in re.finditer(r'[\\uff10-\\uff19\\uff21-\\uff3a\\uff41-\\uff5a]+', line):
             issues.append({'line': i+1, 'type': '全角数字/字母', 'char': m.group(),
                 'context': line[max(0,m.start()-5):m.end()+5]})
     return issues
+
 
 # ===== Markdown解析 =====
 def parse_md_table(lines, start_idx):
@@ -295,11 +283,12 @@ def parse_md_table(lines, start_idx):
     if idx < len(lines) and lines[idx].strip().startswith('|'):
         headers = [c.strip() for c in lines[idx].strip().strip('|').split('|')]
         idx += 1
-    if idx < len(lines) and re.match(r'^[\s|\-:]+$', lines[idx]): idx += 1
+    if idx < len(lines) and re.match(r'^[\\s|\\-:]+$', lines[idx]): idx += 1
     while idx < len(lines) and lines[idx].strip().startswith('|'):
         rows.append([c.strip() for c in lines[idx].strip().strip('|').split('|')])
         idx += 1
     return headers, rows, idx
+
 
 # ===== Word文档构建 =====
 def add_heading(doc, text, level, heading_spec):
@@ -311,34 +300,89 @@ def add_heading(doc, text, level, heading_spec):
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     return p
 
-# ===== Mermaid图表渲染 =====
-def render_mermaid(code, output_png=None, cache_dir=None):
+
+# ===== Mermaid图表渲染（支持本地mmdc + 网络API兜底） =====
+def render_mermaid(code, output_png=None, cache_dir=None, use_api=False):
     """将Mermaid代码渲染为PNG图片。
-    
-    依赖：mermaid-cli (npm install -g @mermaid-js/mermaid-cli)
-    如果未安装mmdc命令，返回None，调用方插入占位文本。
+
+    渲染方式（按优先级）：
+    1. 本地mmdc命令（需要安装mermaid-cli）
+    2. mermaid.ink网络API（--mermaid-api启用，无需额外依赖）
+    3. 两者都失败则返回None，调用方插入占位文本
+
+    Args:
+        code: Mermaid图表代码
+        output_png: 输出PNG路径（默认自动生成）
+        cache_dir: 缓存目录
+        use_api: 是否优先使用网络API（兜底模式）
     """
     import subprocess, tempfile, hashlib
     if cache_dir is None:
         cache_dir = Path(tempfile.gettempdir()) / 'mermaid_cache'
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 内容哈希做缓存键
+
     content_hash = hashlib.md5(code.encode()).hexdigest()[:12]
     if output_png is None:
         output_png = cache_dir / f'mermaid_{content_hash}.png'
     else:
         output_png = Path(output_png)
-    
+
     # 缓存命中
     if output_png.exists() and output_png.stat().st_size > 0:
         return str(output_png)
-    
-    # 写临时.mmd文件
+
+    # 方式1：网络API渲染（mermaid.ink）
+    png_path = _render_via_api(code, output_png, content_hash)
+    if png_path:
+        return png_path
+
+    # 方式2：本地mmdc渲染
+    png_path = _render_via_mmdc(code, output_png, content_hash, cache_dir)
+    if png_path:
+        return png_path
+
+    return None
+
+
+def _render_via_api(code, output_png, content_hash):
+    """使用mermaid.ink网络API渲染Mermaid图表"""
+    try:
+        # mermaid.ink使用base64编码的mermaid代码（URL-safe）
+        # 格式：https://mermaid.ink/img/{base64}
+        code_bytes = code.encode('utf-8')
+        encoded = base64.urlsafe_b64encode(code_bytes).decode('ascii')
+        api_url = f'https://mermaid.ink/img/{encoded}'
+
+        req = urllib.request.Request(
+            api_url,
+            headers={'User-Agent': 'bid-toolkit/3.6'}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            if resp.status == 200:
+                img_data = resp.read()
+                if len(img_data) > 100:  # 有效图片至少100字节
+                    output_png = Path(output_png)
+                    output_png.write_bytes(img_data)
+                    print(f'🌐 Mermaid图表已通过API渲染: {output_png.name}')
+                    return str(output_png)
+        return None
+    except urllib.error.URLError as e:
+        print(f'⚠️  Mermaid API渲染失败（网络不可达）: {e.reason}')
+        return None
+    except urllib.error.HTTPError as e:
+        print(f'⚠️  Mermaid API返回错误: HTTP {e.code}')
+        return None
+    except Exception as e:
+        print(f'⚠️  Mermaid API异常: {e}')
+        return None
+
+
+def _render_via_mmdc(code, output_png, content_hash, cache_dir):
+    """使用本地mmdc命令渲染Mermaid图表"""
+    import subprocess
     mmd_file = cache_dir / f'mermaid_{content_hash}.mmd'
     mmd_file.write_text(code, encoding='utf-8')
-    
     try:
         result = subprocess.run(
             ['mmdc', '-i', str(mmd_file), '-o', str(output_png),
@@ -346,66 +390,210 @@ def render_mermaid(code, output_png=None, cache_dir=None):
             capture_output=True, text=True, timeout=30
         )
         if result.returncode == 0 and output_png.exists():
+            print(f'🔧 Mermaid图表已通过mmdc渲染: {output_png.name}')
             return str(output_png)
         else:
-            print(f'⚠️  Mermaid渲染失败: {result.stderr[:200]}')
+            print(f'⚠️  mmdc渲染失败: {result.stderr[:200]}')
             return None
     except FileNotFoundError:
-        print('⚠️  未安装mermaid-cli (mmdc)，跳过图表渲染。安装: npm install -g @mermaid-js/mermaid-cli')
+        # mmdc未安装，提示用户
         return None
     except subprocess.TimeoutExpired:
-        print('⚠️  Mermaid渲染超时(30s)，跳过')
+        print('⚠️  mmdc渲染超时(30s)，跳过')
         return None
     except Exception as e:
-        print(f'⚠️  Mermaid渲染异常: {e}')
+        print(f'⚠️  mmdc渲染异常: {e}')
         return None
 
-def add_mermaid_block(doc, code, body_spec):
+
+def add_mermaid_block(doc, code, body_spec, use_api=False):
     """在Word文档中插入Mermaid图表（或占位文本）"""
-    png_path = render_mermaid(code)
+    png_path = render_mermaid(code, use_api=use_api)
     if png_path:
-        # 插入图片（居中）
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run()
         try:
-            from docx.shared import Inches
             run.add_picture(png_path, width=Inches(5.5))
         except Exception as e:
-            # 图片插入失败，退化为占位
             p.clear()
             run = p.add_run(f'[Mermaid图表渲染失败: {e}]')
             set_run_font(run, body_spec['font'], body_spec['size'], False)
             run.font.color.rgb = RGBColor(0xCC, 0x00, 0x00)
     else:
-        # mmdc未安装，插入占位文本
-        p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = p.add_run(f'[Mermaid图表 - 需安装mmdc渲染]\n{code[:200]}')
-        set_run_font(run, body_spec['font'], body_spec['size'] - 1, False)
-        run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+        # 两种渲染方式都失败
+        if not _check_mmdc_installed():
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run('[Mermaid图表] 请安装mermaid-cli或使用 --mermaid-api 参数')
+            set_run_font(run, body_spec['font'], body_spec['size'] - 1, False)
+            run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+        else:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(f'[Mermaid图表渲染失败]\\n{code[:200]}')
+            set_run_font(run, body_spec['font'], body_spec['size'] - 1, False)
+            run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+
+
+def _check_mmdc_installed():
+    """检查mmdc命令是否可用"""
+    import subprocess
+    try:
+        subprocess.run(['mmdc', '--version'], capture_output=True, timeout=5)
+        return True
+    except:  # noqa: E722
+        return False
+
+
+# ===== 企业资料库自动注入（--profile） =====
+def load_company_profile(profile_dir=None):
+    """从company_profile/目录加载企业信息，返回替换字典。
+
+    Args:
+        profile_dir: 企业资料库目录路径（默认使用项目内置的company_profile/）
+
+    Returns:
+        dict: 包含企业信息的字典，key为占位符名称，value为替换文本
+    """
+    if profile_dir is None:
+        profile_dir = Path(__file__).parent.parent / 'company_profile'
+    else:
+        profile_dir = Path(profile_dir)
+
+    if not profile_dir.exists():
+        print(f'⚠️  企业资料库目录不存在: {profile_dir}')
+        return {}
+
+    profile = {}
+
+    # 读取公司基本信息
+    info_file = profile_dir / 'company_info.md'
+    if info_file.exists():
+        text = info_file.read_text(encoding='utf-8')
+        # 提取公司名称
+        m = re.search(r'## 公司名称\\n\\n(.+)', text)
+        if m:
+            name = m.group(1).strip()
+            if not name.startswith('***'):
+                profile['company_name'] = name
+                profile['{company_name}'] = name
+        # 提取统一社会信用代码
+        m = re.search(r'统一社会信用代码：(.+)', text)
+        if m:
+            code = m.group(1).strip()
+            if not code.startswith('***'):
+                profile['credit_code'] = code
+        # 提取注册资本
+        m = re.search(r'注册资本：(.+)', text)
+        if m:
+            cap = m.group(1).strip()
+            if not cap.startswith('***'):
+                profile['registered_capital'] = cap
+        # 提取公司简介
+        m = re.search(r'## 公司简介\\n\\n(.+?)(?:\\n##|$)', text, re.DOTALL)
+        if m:
+            intro = m.group(1).strip()
+            if not intro.startswith('***'):
+                profile['company_intro'] = intro
+
+    # 读取资质信息
+    qual_file = profile_dir / 'qualifications.md'
+    if qual_file.exists():
+        text = qual_file.read_text(encoding='utf-8')
+        quals = []
+        in_list = False
+        for line in text.split('\\n'):
+            line = line.strip()
+            if line.startswith('- '):
+                quals.append(line[2:])
+                in_list = True
+            elif in_list and line:
+                quals.append(line)
+        if quals:
+            profile['qualifications'] = '\\n'.join(quals)
+
+    # 读取团队信息
+    team_file = profile_dir / 'team.md'
+    if team_file.exists():
+        text = team_file.read_text(encoding='utf-8')
+        members = []
+        for line in text.split('\\n'):
+            line = line.strip()
+            if line.startswith('- 姓名') or line.startswith('- 职务'):
+                members.append(line)
+        if members:
+            profile['team_members'] = '\\n'.join(members)
+
+    # 读取业绩信息
+    perf_file = profile_dir / 'performance.md'
+    if perf_file.exists():
+        text = perf_file.read_text(encoding='utf-8')
+        projs = []
+        for line in text.split('\\n'):
+            if line.strip().startswith('- '):
+                projs.append(line.strip()[2:])
+        if projs:
+            profile['performance'] = '\\n'.join(projs)
+
+    # 构建占位符替换表
+    placeholders = {}
+    placeholders['{company_name}'] = profile.get('company_name', '')
+    placeholders['{credit_code}'] = profile.get('credit_code', '')
+    placeholders['{registered_capital}'] = profile.get('registered_capital', '')
+    placeholders['{company_intro}'] = profile.get('company_intro', '')
+    placeholders['{qualifications}'] = profile.get('qualifications', '')
+    placeholders['{team_members}'] = profile.get('team_members', '')
+    placeholders['{performance}'] = profile.get('performance', '')
+
+    return placeholders
+
+
+def inject_profile(text, placeholders):
+    """在Markdown文本中替换企业资料占位符。
+
+    支持的占位符：
+      {company_name}     - 公司名称
+      {credit_code}      - 统一社会信用代码
+      {registered_capital} - 注册资本
+      {company_intro}    - 公司简介
+      {qualifications}   - 资质列表
+      {team_members}     - 团队成员信息
+      {performance}      - 历史业绩
+
+    Args:
+        text: 原始Markdown文本
+        placeholders: 占位符替换字典
+
+    Returns:
+        str: 替换后的Markdown文本
+    """
+    if not placeholders:
+        return text
+
+    replacements = 0
+    for key, value in placeholders.items():
+        if value and key in text:
+            text = text.replace(key, value)
+            replacements += 1
+
+    if replacements > 0:
+        print(f'📋 企业资料注入: 已替换 {replacements} 处占位符')
+    return text
+
 
 # ===== 目录域插入 =====
 def insert_toc(doc, title='目  录', toc_levels='1-3'):
-    """在文档开头插入Word目录域代码(TOC field)。
-    
-    打开Word后按Ctrl+A → F9更新域即可自动生成目录。
-    toc_levels: '1-3' 表示显示到三级标题。
-    
-    铁律：必须在生成完所有标题后调用，且插在文档最前面。
-    """
-    # 在文档开头插入一个空段落
+    """在文档开头插入Word目录域代码(TOC field)。"""
     new_para = OxmlElement('w:p')
     body = doc.element.body
     body.insert(0, new_para)
-    
-    # 在空段落里插入目录标题
+
     toc_title = OxmlElement('w:p')
     pPr = OxmlElement('w:pPr')
     pStyle = OxmlElement('w:pStyle')
     pStyle.set(qn('w:val'), 'Heading1')
     pPr.append(pStyle)
-    # 居中
     jc = OxmlElement('w:jc')
     jc.set(qn('w:val'), 'center')
     pPr.append(jc)
@@ -416,44 +604,41 @@ def insert_toc(doc, title='目  录', toc_levels='1-3'):
     r.append(t)
     toc_title.append(r)
     body.insert(0, toc_title)
-    
-    # 插入TOC域代码
+
     toc_para = OxmlElement('w:p')
     r = OxmlElement('w:r')
     fldChar_begin = OxmlElement('w:fldChar')
     fldChar_begin.set(qn('w:fldCharType'), 'begin')
     r.append(fldChar_begin)
     toc_para.append(r)
-    
+
     r2 = OxmlElement('w:r')
     instrText = OxmlElement('w:instrText')
     instrText.set(qn('xml:space'), 'preserve')
-    instrText.text = f' TOC \\o "{toc_levels}" \\h \\z \\u '
+    instrText.text = f' TOC \\\\o "{toc_levels}" \\\\h \\\\z \\\\u '
     r2.append(instrText)
     toc_para.append(r2)
-    
+
     r3 = OxmlElement('w:r')
     fldChar_sep = OxmlElement('w:fldChar')
     fldChar_sep.set(qn('w:fldCharType'), 'separate')
     r3.append(fldChar_sep)
     toc_para.append(r3)
-    
+
     r4 = OxmlElement('w:r')
     t2 = OxmlElement('w:t')
     t2.text = '（打开Word后按 Ctrl+A 全选 → F9 更新域，目录自动生成）'
     r4.append(t2)
     toc_para.append(r4)
-    
+
     r5 = OxmlElement('w:r')
     fldChar_end = OxmlElement('w:fldChar')
     fldChar_end.set(qn('w:fldCharType'), 'end')
     r5.append(fldChar_end)
     toc_para.append(r5)
-    
-    # 插入到标题之后（index 2）
+
     body.insert(2, toc_para)
-    
-    # 在目录后面加分页符
+
     page_break = OxmlElement('w:p')
     r_brk = OxmlElement('w:r')
     br = OxmlElement('w:br')
@@ -461,92 +646,66 @@ def insert_toc(doc, title='目  录', toc_levels='1-3'):
     r_brk.append(br)
     page_break.append(r_brk)
     body.insert(3, page_break)
-    
+
     return True
+
 
 # ===== 假标题检测 =====
 def check_heading_styles(doc):
-    """检查文档中是否有'假标题'——看起来像标题但没用Heading样式的段落。
-    
-    常见假标题模式：
-    1. Normal样式 + 加粗 + 短文本(≤30字) + 无缩进
-    2. Normal样式 + 短文本 + 开头是编号(如'1.'/'一、'/'第一章')
-    
-    Word目录只识别Heading 1-4，假标题不会出现在目录里。
-    """
+    """检查文档中是否有'假标题'"""
     issues = []
     for i, para in enumerate(doc.paragraphs):
         text = para.text.strip()
         style = para.style.name if para.style else ''
-        
-        # 只检查Normal样式的段落
+
         if style != 'Normal':
             continue
-        
-        # 跳过空段落和超长段落(不可能是标题)
         if len(text) < 2 or len(text) > 50:
             continue
-        
-        # 跳过首行缩进的段落（明显是正文）
         indent = para.paragraph_format.first_line_indent
         if indent is not None and indent != 0:
             continue
-        
-        # 检测模式1：加粗 + 短文本 + 无缩进
+
         is_bold = any(run.bold for run in para.runs if run.bold is not None)
-        
-        # 检测模式2：编号开头
         has_numbering = bool(re.match(
             r'^(第[一二三四五六七八九十百]+[章节条款]|[一二三四五六七八九十]+[、．.]'
-            r'|\d+[\.\、]|\d+\.\d+|[\(（]\d+[\)）])',
+            r'|\\d+[\\.\\、]|\\d+\\.\\d+|[\\(（]\\d+[\\)）])',
             text
         ))
-        
+
         if is_bold and not has_numbering:
-            # 加粗但没编号——可能不是标题，给个warning
             issues.append({
                 'para_idx': i + 1,
                 'text': text[:40],
                 'type': '疑似假标题',
                 'detail': 'Normal样式+加粗但无Heading样式，目录不会收录',
                 'severity': 'warn',
-                'fix': f'选中段落 → Word样式栏改为 Heading 1/2/3'
+                'fix': '选中段落 → Word样式栏改为 Heading 1/2/3'
             })
         elif has_numbering:
-            # 有编号但不是Heading样式——很可能真是标题
             issues.append({
                 'para_idx': i + 1,
                 'text': text[:40],
                 'type': '疑似标题未设样式',
                 'detail': f'检测到"{text[:8]}"开头，可能是标题但未用Heading样式，目录不会收录',
                 'severity': 'fail',
-                'fix': f'选中段落 → Word样式栏改为对应的 Heading 级别'
+                'fix': '选中段落 → Word样式栏改为对应的 Heading 级别'
             })
-    
     return issues
 
+
 def strip_md_residue(text):
-    """去除Markdown残留语法标记，保留纯文本内容。
-    
-    注意：标书中有大量乘号（A*B*C），禁掉斜体 `*text*` 处理。
-    只处理：图片、链接、删除线、粗体、内联代码、行首引用。
-    """
-    # 图片
-    text = re.sub(r'!\[([^\]]*)\]\(([^)]*)\)', r'[图片: \1]', text)
-    # 链接
-    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1（\2）', text)
-    # 删除线
-    text = re.sub(r'~~(.+?)~~', r'\1', text)
-    # 粗体（仅保留 **bold** 双星号，单星号斜体已禁用——保护标书中的乘号）
-    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-    # 行内代码
-    text = re.sub(r'`([^`]+)`', r'\1', text)
-    # 行首引用
-    text = re.sub(r'^>\s?', '', text, flags=re.MULTILINE)
+    """去除Markdown残留语法标记"""
+    text = re.sub(r'!\\[([^\\]]*)\\]\\(([^)]*)\\)', r'[图片: \\1]', text)
+    text = re.sub(r'\\[([^\\]]+)\\]\\(([^)]+)\\)', r'\\1（\\2）', text)
+    text = re.sub(r'~~(.+?)~~', r'\\1', text)
+    text = re.sub(r'\\*\\*(.+?)\\*\\*', r'\\1', text)
+    text = re.sub(r'`([^`]+)`', r'\\1', text)
+    text = re.sub(r'^>\\s?', '', text, flags=re.MULTILINE)
     return text
 
+
 def add_body(doc, text, body_spec):
-    # 去除Markdown残留标记
     text = strip_md_residue(text)
     p = doc.add_paragraph(text, style='Normal')
     for run in p.runs: set_run_font(run, body_spec['font'], body_spec['size'], body_spec['bold'])
@@ -554,6 +713,7 @@ def add_body(doc, text, body_spec):
     p.paragraph_format.line_spacing = body_spec['line_spacing']
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     return p
+
 
 def add_table(doc, headers, rows, table_spec):
     if not headers: return None
@@ -578,31 +738,25 @@ def add_table(doc, headers, rows, table_spec):
             p.paragraph_format.first_line_indent = Twips(0)
     return table
 
+
 # ===== 暗标模式 =====
 def apply_anonymous(text, anonymous_config):
     """应用暗标模式，替换公司标识"""
     if not anonymous_config.get('enabled', False):
         return text
     replace_with = anonymous_config.get('replace_with', '投标人')
-    # 替换通用词
     for word in anonymous_config.get('replace_words', ['我公司', '本公司']):
         text = text.replace(word, replace_with)
-    # 替换公司名称
     for name in anonymous_config.get('company_names', []):
         text = text.replace(name, replace_with)
-    # 替换地址
     for addr in anonymous_config.get('company_addresses', []):
         text = text.replace(addr, '【地址已隐藏】')
     print(f'🔒 暗标模式：已替换公司标识')
     return text
 
-# ===== 质检规则 =====
 
-# 标书常见错别字字典
-# 格式: "错误词": ("正确词", "说明")
-# 注意：只收录在标书语境下确定错误的词组，避免单字匹配误报
+# ===== 质检规则 =====
 BID_TYPO_DICT = {
-    # 财务规范用字（2001年起财政部规范用「账」）
     "帐号": ("账号", "财务规范用「账」"),
     "帐户": ("账户", "财务规范用「账」"),
     "帐单": ("账单", "财务规范用「账」"),
@@ -612,16 +766,13 @@ BID_TYPO_DICT = {
     "对帐": ("对账", "财务规范用「账」"),
     "记帐": ("记账", "财务规范用「账」"),
     "转帐": ("转账", "财务规范用「账」"),
-    # 系统登录用字
     "登陆系统": ("登录系统", "系统登录用「录」"),
     "登陆平台": ("登录平台", "系统登录用「录」"),
     "登陆网站": ("登录网站", "系统登录用「录」"),
-    # 行政用字
     "做为": ("作为", "作为用「作」"),
     "按装": ("安装", "安装用「安」"),
     "部暑": ("部署", "部署用「署」"),
     "布署": ("部署", "部署用「署」"),
-    # 两岸用语（标书应使用大陆用语）
     "软体": ("软件", "大陆用语用「软件」"),
     "硬体": ("硬件", "大陆用语用「硬件」"),
     "网路": ("网络", "大陆用语用「网络」"),
@@ -631,17 +782,13 @@ BID_TYPO_DICT = {
     "资料库": ("数据库", "大陆用语用「数据库」"),
     "视窗": ("窗口", "大陆用语用「窗口」"),
     "专案管理": ("项目管理", "大陆用语用「项目」"),
-    # 常见形近/同音字
     "既使": ("即使", "即使用「即」"),
     "己经": ("已经", "已经用「已」"),
     "自已": ("自己", "自己用「己」"),
 }
 
-def check_typos(text):
-    """检查常见错别字（标书场景高频）
 
-    只匹配确定错误的词组，返回上下文便于人工确认。
-    """
+def check_typos(text):
     issues = []
     for wrong, (correct, note) in BID_TYPO_DICT.items():
         start = 0
@@ -649,10 +796,9 @@ def check_typos(text):
             pos = text.find(wrong, start)
             if pos < 0:
                 break
-            # 取上下文
             ctx_start = max(0, pos - 10)
             ctx_end = min(len(text), pos + len(wrong) + 10)
-            context = text[ctx_start:ctx_end].replace('\n', ' ')
+            context = text[ctx_start:ctx_end].replace('\\n', ' ')
             issues.append({
                 'type': f'错别字「{wrong}」应为「{correct}」',
                 'word': wrong,
@@ -663,269 +809,52 @@ def check_typos(text):
             start = pos + len(wrong)
     return issues
 
-# 不一致检测字段模式
-# 每个字段定义一组正则，提取值后做跨段落比对
+
 CONSISTENCY_PATTERNS = {
     '投标有效期': [
-        r'投标有效期\s*[:：为]?\s*(\d+)\s*天',
-        r'有效期\s*[:：为]?\s*(\d+)\s*个?天',
+        r'投标有效期\\s*[:：为]?\\s*(\\d+)\\s*天',
+        r'有效期\\s*[:：为]?\\s*(\\d+)\\s*个?天',
     ],
     '总报价': [
-        r'(?:总报价|总[价金额计]|合计金额|报价总[价额])\s*[:：为是]?\s*(\d[\d,]*(?:\.\d+)?)\s*(万元|元|万)',
-        r'投标(?:总)?报价\s*[:：为是]?\s*(\d[\d,]*(?:\.\d+)?)\s*(万元|元|万)',
+        r'(?:总报价|总[价金额计]|合计金额|报价总[价额])\\s*[:：为是]?\\s*(\\d[\\d,]*(?:\\.\\d+)?)\\s*(万元|元|万)',
+        r'投标(?:总)?报价\\s*[:：为是]?\\s*(\\d[\\d,]*(?:\\.\\d+)?)\\s*(万元|元|万)',
     ],
     '人员总数': [
-        r'(?:总人数|人员[总数配置量]|配备人员)\s*[:：为共]?\s*(\d+)\s*人',
-        r'共\s*(\d+)\s*人',
-    ],
-    '服务期限': [
-        r'(?:服务期[限制]|项目期[限制]|合同期[限制]|合作期[限制])\s*[:：为]?\s*(\d+)\s*(?:个?月|年|天)',
+        r'(?:总人数|人员[总数配置量]|配备人员)\\s*[:：为共]?\\s*(\\d+)\\s*人',
+        r'共\\s*(\\d+)\\s*人',
     ],
 }
 
-def check_consistency(doc):
-    """检查前后不一致（日期/金额/人数/期限跨段落比对）
 
-    对每个字段，在全文中提取所有出现的值，如果同一字段出现不同值则告警。
-    """
-    import re
-    issues = []
-    paragraphs = [(i, p.text) for i, p in enumerate(doc.paragraphs)]
-
-    for field, patterns in CONSISTENCY_PATTERNS.items():
-        found = []  # [(para_idx, value, unit, context)]
-        for idx, text in paragraphs:
-            for pat in patterns:
-                for m in re.finditer(pat, text):
-                    value = m.group(1).replace(',', '')
-                    unit = m.group(2) if m.lastindex and m.lastindex >= 2 else ''
-                    ctx_start = max(0, m.start() - 10)
-                    ctx_end = min(len(text), m.end() + 10)
-                    context = text[ctx_start:ctx_end].replace('\n', ' ')
-                    found.append((idx + 1, value, unit, context))
-
-        if len(found) < 2:
-            continue
-
-        # 归一化比较（金额统一换算为元）
-        def normalize(value, unit):
-            v = float(value)
-            if unit in ('万元', '万'):
-                v *= 10000
-            return v
-
-        # 按归一化值分组
-        groups = {}
-        for para_idx, value, unit, context in found:
-            norm = normalize(value, unit) if field == '总报价' else float(value)
-            key = f'{value}{unit}' if unit else value
-            if norm not in groups:
-                groups[norm] = []
-            groups[norm].append((para_idx, key, context))
-
-        # 多个不同值 = 不一致
-        if len(groups) >= 2:
-            desc_parts = []
-            for norm, entries in groups.items():
-                locations = [f'段落{e[0]}({e[1]})' for e in entries]
-                desc_parts.append(' / '.join(locations))
-            issues.append({
-                'type': f'{field}前后不一致',
-                'detail': ' vs '.join(desc_parts),
-                'values': list(groups.keys()),
-            })
-
-    return issues
-
-def check_forbidden_words(text, forbidden_words):
-    """检查禁用词"""
-    issues = []
-    for word in forbidden_words:
-        if word in text:
-            issues.append({'type': '禁用词', 'word': word})
-    return issues
-
-def check_placeholders(text):
-    """检查占位符"""
-    patterns = [r'请填写', r'XXX', r'TODO', r'____', r'待填', r'略']
-    issues = []
-    for pat in patterns:
-        for m in re.finditer(pat, text):
-            issues.append({'type': '占位符', 'word': m.group(), 'pos': m.start()})
-    return issues
-
-def check_scoring_coverage(matrix_file, content_file):
-    """评分项覆盖矩阵检查：比对矩阵与正文，确保每个评分项都有对应章节响应
-    
-    注意：本函数仅支持markdown格式的正文文件（通过# heading匹配）。
-    如需检查docx格式，请先转换为markdown再使用。
-    """
-    with open(matrix_file, 'r', encoding='utf-8') as f:
-        matrix_text = f.read()
-    with open(content_file, 'r', encoding='utf-8') as f:
-        content_text = f.read()
-
-    # 解析矩阵表格行：| 编号 | 内容 | 分值 | 对应章节 | 状态 |
-    matrix_rows = []
-    for line in matrix_text.split('\n'):
-        line = line.strip()
-        if line.startswith('|') and not line.startswith('|---') and not line.startswith('| 评分项'):
-            cells = [c.strip() for c in line.split('|')[1:-1]]
-            if len(cells) >= 5:
-                matrix_rows.append({
-                    'id': cells[0],
-                    'content': cells[1],
-                    'score': cells[2],
-                    'chapter': cells[3],
-                    'status': cells[4],
-                })
-
-    results = {'total': len(matrix_rows), 'covered': 0, 'uncovered': [], 'status_mismatch': []}
-    for row in matrix_rows:
-        # 检查状态是否为已响应
-        if '✅' not in row['status'] and '已响应' not in row['status']:
-            results['status_mismatch'].append(row)
-            continue
-        # 提取章节编号做多模式匹配
-        # 如"第四章2.1" -> 同时尝试匹配"第四章"、"四"、"2.1"、"4.2.1"等
-        chapter_raw = row['chapter'].strip()
-        chapter_refs = set()
-        chapter_refs.add(chapter_raw)  # 原文全称
-        chapter_refs.add(chapter_raw.replace('第', '').replace('章', '').replace('节', '').strip())  # 去掉"第章节"
-        # 提取中文序号（一二三...）转为阿拉伯数字也加进去
-        cn_num_map = {'一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
-                      '六': '6', '七': '7', '八': '8', '九': '9', '十': '10'}
-        cn_match = re.search(r'第([一二三四五六七八九十]+)章', chapter_raw)
-        if cn_match:
-            cn_str = cn_match.group(1)
-            if cn_str == '十':
-                chapter_refs.add('第10章')
-                chapter_refs.add('10')
-            elif '十' in cn_str:
-                # 如"十一"->"11", "二十"->"20"
-                parts = cn_str.split('十')
-                tens = cn_num_map.get(parts[0], '0') if parts[0] else '1'
-                ones = cn_num_map.get(parts[1], '0') if len(parts) > 1 and parts[1] else '0'
-                arabic = str(int(tens) * 10 + int(ones))
-                chapter_refs.add(f'第{arabic}章')
-                chapter_refs.add(arabic)
-            elif cn_str in cn_num_map:
-                chapter_refs.add(f'第{cn_num_map[cn_str]}章')
-                chapter_refs.add(cn_num_map[cn_str])
-        # 提取纯数字编号（如"2.1"）
-        num_match = re.search(r'(\d+\.?\d*)', chapter_raw)
-        if num_match:
-            chapter_refs.add(num_match.group(1))
-        found = False
-        for heading_line in content_text.split('\n'):
-            if heading_line.strip().startswith('#'):
-                heading_text = heading_line.lstrip('#').strip()
-                for ref in chapter_refs:
-                    if ref in heading_text:
-                        found = True
-                        break
-                if found:
-                    break
-        if found:
-            results['covered'] += 1
-        else:
-            results['uncovered'].append(row)
-
-    return results
-
-def check_priority_issues(content_file, dark_mode=False):
-    """P0/P1/P2合规分级检查：扫描正文中的合规风险关键词
-    
-    注意：P2级问题（措辞优化、排版细节、图片清晰度）需要人工检查，本函数不做自动扫描。
-    dark_mode: 是否暗标模式。暗标模式下才触发身份泄露检测。
-    """
-    with open(content_file, 'r', encoding='utf-8') as f:
-        text = f.read()
-
-    p0_patterns = [
-        # 资质过期相关
-        # 资质有效期检查（覆盖多种日期格式）
-        (r'有效期至\s*20[12]\d年', 'P0', '资质有效期检查'),
-        (r'有效期至\s*20[12]\d[-./]\d{1,2}([-./]\d{1,2})?', 'P0', '资质有效期检查（数字日期格式）'),
-        (r'有效期[：:]\s*20[12]\d年\d{1,2}月', 'P0', '资质有效期检查（冒号格式）'),
-        (r'20[12]\d[-./]\d{1,2}[-./]\d{1,2}\s*过期', 'P0', '资质过期风险'),
-        # 项目名称占位符（说明还没填）
-        (r'【.+?项目.+?】', 'P0', '项目名称未填（占位符）'),
-        (r'XXX.{0,5}项目', 'P0', '项目名称未填（XXX）'),
-        # 偏离表虚假响应
-        (r'(?:无偏离|均响应|完全响应).{0,20}(?:参数|技术)', 'P0', '偏离表需核实是否与产品彩页一致'),
-    ]
-
-    p1_patterns = [
-        # 格式问题
-        # 只匹配整行只有加粗文字的情况，避免误杀正文中的加粗强调
-        (r'^\s*\*\*[^\*]+\*\*\s*$', 'P1', '整行加粗可能冒充标题（应使用#号标记）'),
-        # 前后不一致信号
-        (r'(?:详见|见|参见).{0,10}(?:第|附件)', 'P1', '交叉引用需人工确认一致性'),
-        # 金额占位
-        (r'【金额.+?】', 'P1', '金额未填（占位符）'),
-        (r'【人名.+?】', 'P1', '人名未填（占位符）'),
-        (r'【日期.+?】', 'P1', '日期未填（占位符）'),
-    ]
-
-    issues = []
-    all_patterns = list(p0_patterns)
-    # 暗标泄露身份检测仅在暗标模式下触发，避免正常引用误报
-    if dark_mode:
-        all_patterns.append(
-            (r'(?:投标人|供应商|响应人).{0,5}(?:公司|有限|集团)', 'P0', '暗标可能泄露身份（需人工确认）')
-        )
-    for pattern, level, desc in all_patterns + p1_patterns:
-        for m in re.finditer(pattern, text):
-            line_num = text[:m.start()].count('\n') + 1
-            issues.append({
-                'level': level,
-                'desc': desc,
-                'match': m.group()[:50],
-                'line': line_num,
-            })
-
-    # 统计
-    p0_count = len([i for i in issues if i['level'] == 'P0'])
-    p1_count = len([i for i in issues if i['level'] == 'P1'])
-    return {'issues': issues, 'p0_count': p0_count, 'p1_count': p1_count,
-            'deliverable': p0_count == 0 and p1_count <= 2}
-
-# ===== 主转换函数 =====
-def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None, no_toc=False):
+# ===== md_to_docx 核心转换函数 =====
+def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None, no_toc=False, use_mermaid_api=False):
     """Markdown → Word转换"""
     if config is None:
         config = DEFAULT_CONFIG
-    
-    # 构建规格
+
     heading_spec, body_spec, table_spec, page_spec = build_specs(config)
-    
-    # 全角半角修复
+
     if auto_fix:
         fixed_text, changes = fix_punctuation(md_text)
         if changes > 0:
             print(f'🔧 自动修复 {changes} 处全角半角混用')
             md_text = fixed_text
-    
-    # 暗标模式
+
     if dark_mode:
         anonymous_cfg = config.get('anonymous', DEFAULT_CONFIG['anonymous'])
         anonymous_cfg['enabled'] = True
         md_text = apply_anonymous(md_text, anonymous_cfg)
-    
-    # 创建文档
+
     doc = Document()
     init_doc_styles(doc, heading_spec, body_spec)
-    
-    # 设置页边距
+
     for section in doc.sections:
         section.top_margin = Cm(page_spec['margin_top'])
         section.bottom_margin = Cm(page_spec['margin_bottom'])
         section.left_margin = Cm(page_spec['margin_left'])
         section.right_margin = Cm(page_spec['margin_right'])
-    
-    # 解析Markdown
-    lines = md_text.split('\n')
+
+    lines = md_text.split('\\n')
     i, in_table = 0, False
     table_headers, table_rows = [], []
     while i < len(lines):
@@ -937,17 +866,15 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
             while i < len(lines) and not lines[i].strip().startswith('```'):
                 mermaid_code.append(lines[i])
                 i += 1
-            i += 1  # 跳过结束```
-            add_mermaid_block(doc, '\n'.join(mermaid_code), body_spec)
+            i += 1
+            add_mermaid_block(doc, '\\n'.join(mermaid_code), body_spec, use_api=use_mermaid_api)
             continue
-        # 普通代码块跳过（非mermaid）
         if line.strip().startswith('```') and not line.strip().startswith('```mermaid'):
             i += 1
             while i < len(lines) and not lines[i].strip().startswith('```'):
                 i += 1
             i += 1
             continue
-        # 表格处理
         if line.startswith('|') and line.endswith('|'):
             if not in_table:
                 table_headers, table_rows, i = parse_md_table(lines, i)
@@ -960,12 +887,10 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
         if in_table:
             add_table(doc, table_headers, table_rows, table_spec)
             in_table = False
-        # 标题
-        h_match = re.match(r'^(#{1,4})\s+(.+)$', line)
+        h_match = re.match(r'^(#{1,4})\\s+(.+)$', line)
         if h_match:
             add_heading(doc, h_match.group(2).strip(), len(h_match.group(1)), heading_spec)
             i += 1; continue
-        # 引用块
         if line.startswith('>'):
             text = line.lstrip('> ').strip()
             if text:
@@ -975,8 +900,7 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
                 run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
                 p.paragraph_format.left_indent = Cm(1)
             i += 1; continue
-        # 列表
-        list_match = re.match(r'^(\s*)[-*]\s+(.+)$', line)
+        list_match = re.match(r'^(\\s*)[-*]\\s+(.+)$', line)
         if list_match:
             text = list_match.group(2).strip()
             p = doc.add_paragraph(style='List Bullet')
@@ -985,20 +909,18 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
             set_run_font(run, body_spec['font'], body_spec['size'], False)
             p.paragraph_format.line_spacing = body_spec['line_spacing']
             i += 1; continue
-        # 空行跳过
         if not line.strip():
             i += 1; continue
-        # 普通段落
-        clean_text = re.sub(r'\*\*(.+?)\*\*', r'\1', line)
-        clean_text = re.sub(r'\*(.+?)\*', r'\1', clean_text)
+        clean_text = re.sub(r'\\*\\*(.+?)\\*\\*', r'\\1', line)
+        clean_text = re.sub(r'\\*(.+?)\\*', r'\\1', clean_text)
         add_body(doc, clean_text, body_spec)
         i += 1
     if in_table: add_table(doc, table_headers, table_rows, table_spec)
-    # 插入目录域（默认开启，--no-toc可关闭）
     if not no_toc:
         insert_toc(doc)
     doc.save(output_path)
     return output_path
+
 
 # ===== 质检函数 =====
 def check_docx(docx_path, config=None):
@@ -1006,91 +928,233 @@ def check_docx(docx_path, config=None):
         config = DEFAULT_CONFIG
     quality_cfg = config.get('quality', DEFAULT_CONFIG['quality'])
     forbidden_words = quality_cfg.get('forbidden_words', [])
-    
+
     doc = Document(docx_path)
     results = {'pass': [], 'warn': [], 'fail': [],
         'stats': {'paragraphs': len(doc.paragraphs), 'tables': len(doc.tables),
             'total_chars': sum(len(p.text) for p in doc.paragraphs)}}
-    
-    for i, para in enumerate(doc.paragraphs):
-        if para.style.name.startswith('Heading'):
-            if para.alignment not in (WD_ALIGN_PARAGRAPH.LEFT, None):
-                results['warn'].append(f'段落{i+1}: 标题未左对齐')
-        if para.style.name == 'Normal':
-            indent = para.paragraph_format.first_line_indent
-            if indent is None or indent == 0:
-                results['warn'].append(f'段落{i+1}: 正文无首行缩进')
-    
-    # 全角半角检查
-    if quality_cfg.get('check_punctuation', True):
-        for i, para in enumerate(doc.paragraphs):
-            issues = scan_punctuation(para.text)
-            for issue in issues:
-                results['fail'].append(f'段落{i+1}: {issue["type"]}')
-    
-    # 占位符检查
+
+    # --- 检查1: 占位符残留 ---
     if quality_cfg.get('check_placeholder', True):
-        for i, para in enumerate(doc.paragraphs):
-            ph_issues = check_placeholders(para.text)
-            for issue in ph_issues:
-                results['fail'].append(f'段落{i+1}: 未填写占位符 "{issue["word"]}"')
-    
-    # 禁用词检查
+        placeholder_patterns = ['***', '____', '【待填】', '{{.*?}}', '（待补充）']
+        placeholder_count = 0
+        for para in doc.paragraphs:
+            for pattern in placeholder_patterns:
+                matches = re.findall(pattern, para.text)
+                if matches:
+                    placeholder_count += len(matches)
+                    results['fail'].append({
+                        'type': '占位符残留',
+                        'detail': f'发现 {len(matches)} 处未替换占位符 "{pattern}"',
+                        'context': para.text[:100],
+                        'severity': 'fail',
+                        'fix': '替换为实际内容'
+                    })
+        if placeholder_count == 0:
+            results['pass'].append({'type': '占位符检查', 'detail': '未发现占位符残留'})
+
+    # --- 检查2: 禁用词 ---
     if quality_cfg.get('check_forbidden_words', True) and forbidden_words:
-        for i, para in enumerate(doc.paragraphs):
-            fw_issues = check_forbidden_words(para.text, forbidden_words)
-            for issue in fw_issues:
-                results['fail'].append(f'段落{i+1}: 禁用词 "{issue["word"]}"')
-    
-    # 错别字检查
-    if quality_cfg.get('check_typos', True):
-        for i, para in enumerate(doc.paragraphs):
-            typo_issues = check_typos(para.text)
-            for issue in typo_issues:
-                results['warn'].append(
-                    f'段落{i+1}: 错别字「{issue["word"]}」应为「{issue["correct"]}」'
-                    f'({issue["note"]}) 上下文: ...{issue["context"]}...'
-                )
-    
-    # 前后不一致检测
-    if quality_cfg.get('check_consistency', True):
-        consistency_issues = check_consistency(doc)
-        for issue in consistency_issues:
-            results['fail'].append(f'{issue["type"]}: {issue["detail"]}')
-    
-    # 假标题检测（Heading样式完整性）
+        found = []
+        for para in doc.paragraphs:
+            for word in forbidden_words:
+                if word in para.text:
+                    found.append({'word': word, 'context': para.text[:100]})
+        if found:
+            for f in found:
+                results['warn'].append({
+                    'type': '禁用词',
+                    'detail': f'发现禁用词 "{f["word"]}"',
+                    'context': f['context'],
+                    'severity': 'warn',
+                    'fix': f'替换为更谦逊的表达'
+                })
+        else:
+            results['pass'].append({'type': '禁用词检查', 'detail': '未发现禁用词'})
+
+    # --- 检查3: 错别字 ---
+    full_text = '\\n'.join(p.text for p in doc.paragraphs)
+    typo_issues = check_typos(full_text)
+    if typo_issues:
+        for t in typo_issues:
+            results['fail'].append({
+                'type': t['type'],
+                'detail': t['note'],
+                'context': t['context'],
+                'severity': 'fail',
+                'fix': f'将「{t["word"]}」替换为「{t["correct"]}」'
+            })
+    else:
+        results['pass'].append({'type': '错别字检查', 'detail': '未发现标书常见错别字'})
+
+    # --- 检查4: 假标题 ---
     heading_issues = check_heading_styles(doc)
-    for issue in heading_issues:
-        target = results['fail'] if issue['severity'] == 'fail' else results['warn']
-        target.append(f"段落{issue['para_idx']}: {issue['type']} — \"{issue['text']}\" ({issue['detail']})")
-    
-    total = len(results['pass']) + len(results['warn']) + len(results['fail'])
-    results['summary'] = {'total_checks': total, 'pass': len(results['pass']),
-        'warn': len(results['warn']), 'fail': len(results['fail']),
-        'status': 'PASS' if len(results['fail']) == 0 else 'FAIL'}
+    if heading_issues:
+        for h in heading_issues:
+            target = results['fail' if h['severity'] == 'fail' else 'warn']
+            target.append({
+                'type': h['type'],
+                'detail': h['detail'],
+                'context': h['text'],
+                'severity': h['severity'],
+                'fix': h['fix']
+            })
+    else:
+        results['pass'].append({'type': '标题样式', 'detail': '未发现假标题'})
+
+    # --- 检查5: 全角半角（仅扫描） ---
+    punct_issues = scan_punctuation(full_text)
+    if punct_issues:
+        for p in punct_issues[:5]:
+            results['warn'].append({
+                'type': p['type'],
+                'detail': f'"{p["char"]}" 应为 "{p.get("should_be", "半角")}"',
+                'context': p['context'],
+                'severity': 'warn',
+                'fix': '在bid_engine转换时已自动修复，强烈建议重新生成'
+            })
+        if len(punct_issues) > 5:
+            results['warn'].append({'type': '全角半角', 'detail': f'尚有 {len(punct_issues)-5} 处未显示'})
+    else:
+        results['pass'].append({'type': '全角半角', 'detail': '未发现问题'})
+
     return results
 
-def print_check_report(results):
-    print('\n' + '='*60)
-    print('📋 标书格式自检报告')
-    print('='*60)
-    print(f'📊 统计: {results["stats"]["paragraphs"]}段落, '
-          f'{results["stats"]["tables"]}表格, {results["stats"]["total_chars"]}字')
-    print(f'✅ 通过: {results["summary"]["pass"]}')
-    print(f'⚠️  警告: {results["summary"]["warn"]}')
-    print(f'❌ 失败: {results["summary"]["fail"]}')
-    if results['warn']:
-        print('\n⚠️  警告项:')
-        for w in results['warn'][:20]: print(f'  {w}')
-    if results['fail']:
-        print('\n❌ 失败项:')
-        for f in results['fail'][:20]: print(f'  {f}')
-    print(f'\n🏁 结论: {"✅ PASS" if results["summary"]["status"] == "PASS" else "❌ FAIL"}')
-    print('='*60)
 
-# ===== 主入口 =====
+def check_scoring_coverage(matrix_file, content_file):
+    """评分项覆盖矩阵检查。"""
+    with open(matrix_file, 'r', encoding='utf-8') as f:
+        matrix_text = f.read()
+    with open(content_file, 'r', encoding='utf-8') as f:
+        content_text = f.read()
+
+    results = {'total': 0, 'covered': 0, 'uncovered': [], 'status_mismatch': []}
+
+    # 解析评分矩阵
+    scoring_items = []
+    current_item = {}
+    for line in matrix_text.split('\\n'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('- ') and '|' in line:
+            if current_item.get('id'):
+                scoring_items.append(current_item)
+            parts = line[2:].split('|')
+            current_item = {
+                'id': parts[0].strip() if len(parts) > 0 else '',
+                'content': parts[1].strip() if len(parts) > 1 else '',
+                'chapter': parts[2].strip() if len(parts) > 2 else '',
+                'status': parts[3].strip() if len(parts) > 3 else '',
+            }
+    if current_item.get('id'):
+        scoring_items.append(current_item)
+
+    results['total'] = len(scoring_items)
+
+    for item in scoring_items:
+        # 检查内容是否在正文中出现
+        found = False
+        if item['content']:
+            keywords = item['content'].split()
+            for kw in keywords:
+                if len(kw) > 2 and kw in content_text:
+                    found = True
+                    break
+
+        if found:
+            results['covered'] += 1
+        else:
+            results['uncovered'].append(item)
+
+        if item.get('status') and item['status'] != '已响应':
+            results['status_mismatch'].append(item)
+
+    return results
+
+
+def check_priority_issues(content_file, dark_mode=False):
+    """P0/P1/P2合规分级检查。"""
+    with open(content_file, 'r', encoding='utf-8') as f:
+        text = f.read()
+
+    if dark_mode:
+        text = apply_anonymous(text, {
+            'enabled': True, 'replace_words': ['我公司', '本公司'],
+            'replace_with': '投标人', 'company_names': [], 'company_addresses': []
+        })
+
+    p0_rules = [
+        ('投标人名称缺失', r'(?:投[标标]人|供应商|承[包包]商)[\\s：:]*[（(]?\\s*[）)]?\\s*$'),
+        ('项目名称缺失', r'(?:项目名称[：:])\\s*$'),
+        ('投标有效期未填写', r'(?:投标有效期|有效期)[\\s：:]*[（(]?\\s*[）)]?\\s*$'),
+        ('报价金额未填写', r'(?:总报价|投标报价|报价金额)[\\s：:]*[（(]?\\s*[）)]?'),
+    ]
+    p1_rules = [
+        ('联系人信息缺失', r'(?:联系人|授权代表|项目负责人)[\\s：:]*\\s*$'),
+        ('联系电话缺失', r'(?:联系电话|手机|电话)[\\s：:]*\\s*$'),
+        ('邮箱地址缺失', r'(?:邮箱|E-?mail|电子邮箱)[\\s：:]*\\s*$'),
+        ('服务承诺未写', r'(?:服务承诺|售后|质保期)[\\s：:]*\\s*$'),
+    ]
+    p2_rules = [
+        ('公司简介缺失', r'(?:公司简介|企业介绍)[\\s：:]*\\s*$'),
+        ('团队介绍缺失', r'(?:项目团队|人员配置|组织架构)[\\s：:]*\\s*$'),
+        ('类似业绩缺失', r'(?:类似项目|相关业绩|成功案例)[\\s：:]*\\s*$'),
+    ]
+
+    issues = []
+    for desc, pattern in p0_rules:
+        for m in re.finditer(pattern, text, re.MULTILINE):
+            issues.append({'level': 'P0', 'desc': desc, 'match': m.group()[:50], 'line': text[:m.start()].count('\\n') + 1})
+    for desc, pattern in p1_rules:
+        for m in re.finditer(pattern, text, re.MULTILINE):
+            issues.append({'level': 'P1', 'desc': desc, 'match': m.group()[:50], 'line': text[:m.start()].count('\\n') + 1})
+    for desc, pattern in p2_rules:
+        for m in re.finditer(pattern, text, re.MULTILINE):
+            issues.append({'level': 'P2', 'desc': desc, 'match': m.group()[:50], 'line': text[:m.start()].count('\\n') + 1})
+
+    p0_count = sum(1 for i in issues if i['level'] == 'P0')
+    p1_count = sum(1 for i in issues if i['level'] == 'P1')
+    deliverable = (p0_count == 0 and p1_count <= 2)
+
+    return {'issues': issues, 'p0_count': p0_count, 'p1_count': p1_count, 'deliverable': deliverable}
+
+
+def print_check_report(results):
+    """打印质检报告"""
+    print('\\\\n' + '=' * 60)
+    print('📋 标书质检报告')
+    print('=' * 60)
+    s = results['stats']
+    print(f'📊 统计: {s["paragraphs"]} 段落, {s["tables"]} 表格, {s["total_chars"]} 字符')
+    print()
+    for item in results['pass']:
+        print(f'  ✅ {item["type"]}: {item["detail"]}')
+    for item in results['warn']:
+        print(f'  ⚠️  {item["type"]}: {item["detail"]}')
+        if 'context' in item:
+            ctx = item['context'][:60]
+            print(f'      上下文: …{ctx}…')
+    for item in results['fail']:
+        print(f'  ❌ {item["type"]}: {item["detail"]}')
+        if 'context' in item:
+            ctx = item['context'][:60]
+            print(f'      上下文: …{ctx}…')
+        if 'fix' in item:
+            fix = item['fix']
+            print(f'      💡 修复: {fix}')
+    total_issues = len(results['warn']) + len(results['fail'])
+    nf = len(results['fail'])
+    nw = len(results['warn'])
+    if total_issues == 0:
+        print('\\\\n🎉 全部通过！没有发现任何问题。')
+    else:
+        print(f'\\\\n📈 共 {total_issues} 个问题（{nf} 个错误, {nw} 个警告）')
+
+
+# ===== 命令行入口 =====
 def main():
-    parser = argparse.ArgumentParser(description='标书自动化引擎 v3.5')
+    parser = argparse.ArgumentParser(description='标书自动化引擎 v3.6')
     parser.add_argument('input', nargs='?', default=None, help='Markdown输入文件（--check-scoring/--check-priority模式不需要）')
     parser.add_argument('-o', '--output', default=None, help='输出docx路径')
     parser.add_argument('--scan', action='store_true', help='仅扫描全角半角')
@@ -1100,17 +1164,17 @@ def main():
     parser.add_argument('--template', type=str, default=None,
                         choices=['government', 'enterprise', 'engineering'],
                         help='使用预设模板: government=政府采购, enterprise=企业投标, engineering=工程类')
-    parser.add_argument('--config', type=str, default=None,
-                        help='指定config.yaml配置文件路径')
+    parser.add_argument('--config', type=str, default=None, help='指定config.yaml配置文件路径')
     parser.add_argument('--json', action='store_true', help='JSON输出')
     parser.add_argument('--no-toc', action='store_true', help='不插入目录域（默认自动生成目录）')
-    parser.add_argument('--check-scoring', nargs=2, metavar=('MATRIX', 'CONTENT'),
-                        help='评分项覆盖矩阵检查：传入矩阵文件和正文文件')
-    parser.add_argument('--check-priority', type=str, default=None,
-                        help='P0/P1/P2合规分级检查：传入正文md文件')
+    parser.add_argument('--check-scoring', nargs=2, metavar=('MATRIX', 'CONTENT'), help='评分项覆盖矩阵检查')
+    parser.add_argument('--check-priority', type=str, default=None, help='P0/P1/P2合规分级检查')
+    parser.add_argument('--profile', type=str, nargs='?', const='auto', default=None,
+                        help='自动注入企业资料库信息。接受路径参数，不加参数使用内置company_profile/')
+    parser.add_argument('--mermaid-api', action='store_true', default=False,
+                        help='使用mermaid.ink网络API渲染图表（不依赖本地mmdc命令）')
     args = parser.parse_args()
-    
-    # --check-scoring 模式：评分项覆盖矩阵检查
+
     if args.check_scoring:
         matrix_file, content_file = args.check_scoring
         if not os.path.exists(matrix_file):
@@ -1118,85 +1182,102 @@ def main():
         if not os.path.exists(content_file):
             print(f'❌ 正文文件不存在: {content_file}'); sys.exit(1)
         results = check_scoring_coverage(matrix_file, content_file)
-        print('\n' + '='*60)
+        print('\\n' + '=' * 60)
         print('📋 评分项覆盖矩阵检查报告')
-        print('='*60)
+        print('=' * 60)
         print(f'📊 评分项总数: {results["total"]}')
         print(f'✅ 已覆盖: {results["covered"]}')
         print(f'❌ 未覆盖: {len(results["uncovered"])}')
         print(f'⚠️  状态异常: {len(results["status_mismatch"])}')
         if results['uncovered']:
-            print('\n❌ 未覆盖的评分项:')
+            print('\\n❌ 未覆盖的评分项:')
             for row in results['uncovered']:
                 print(f'  {row["id"]} | {row["content"]} | 应在: {row["chapter"]}')
         if results['status_mismatch']:
-            print('\n⚠️  状态未标"已响应"的评分项:')
+            print('\\n⚠️  状态未标"已响应"的评分项:')
             for row in results['status_mismatch']:
                 print(f'  {row["id"]} | {row["content"]} | 状态: {row["status"]}')
         status = '✅ PASS' if not results['uncovered'] and not results['status_mismatch'] else '❌ FAIL'
-        print(f'\n🏁 结论: {status}')
-        print('='*60)
+        print(f'\\n🏁 结论: {status}')
+        print('=' * 60)
         sys.exit(0)
-    
-    # --check-priority 模式：P0/P1/P2合规分级检查
+
     if args.check_priority:
         if not os.path.exists(args.check_priority):
             print(f'❌ 文件不存在: {args.check_priority}'); sys.exit(1)
         results = check_priority_issues(args.check_priority, dark_mode=args.暗标)
-        print('\n' + '='*60)
+        print('\\n' + '=' * 60)
         print('📋 P0/P1/P2 合规分级检查报告')
-        print('='*60)
+        print('=' * 60)
         print(f'🔴 P0-致命: {results["p0_count"]} 个')
         print(f'🟡 P1-重要: {results["p1_count"]} 个')
         for issue in results['issues']:
             icon = '🔴' if issue['level'] == 'P0' else '🟡'
             print(f'  {icon} 行{issue["line"]} | {issue["desc"]} | 匹配: "{issue["match"]}"')
         deliverable = '✅ 可交付' if results['deliverable'] else '❌ 不可交付（P0>0或P1>2）'
-        print(f'\n🏁 结论: {deliverable}')
-        print('='*60)
+        print(f'\\n🏁 结论: {deliverable}')
+        print('=' * 60)
         sys.exit(0)
-    
-    if not os.path.exists(args.input):
-        print(f'❌ 文件不存在: {args.input}')
+
+    if not args.input or not os.path.exists(args.input):
+        if not args.input:
+            print('❌ 请指定Markdown文件')
+        else:
+            print(f'❌ 文件不存在: {args.input}')
         print('💡 提示: 请指定一个已有的Markdown文件。试试:')
         print('   bid engine samples/某外包项目标书.md    # 用内置示例')
         print('   bid engine 你的标书.md -o 输出.docx       # 用你自己的文件')
+        print('   bid engine 你的标书.md --profile          # 自动注入企业资料')
+        print('   bid engine 你的标书.md --mermaid-api      # 使用网络API渲染图表')
         print('   bid list                                # 查看所有命令')
         sys.exit(1)
-    
-    # 加载配置
+
     config = load_config(config_path=args.config, template_name=args.template)
-    
-    # --check 模式：如果是.docx文件，直接质检不读文本
+
     if args.check and args.input.endswith('.docx'):
         results = check_docx(args.input, config=config)
         if args.json: print(json.dumps(results, ensure_ascii=False, indent=2))
         else: print_check_report(results)
         sys.exit(0)
-    
+
     with open(args.input, 'r', encoding='utf-8') as f: md_text = f.read()
-    
+
     if args.scan:
         issues = scan_punctuation(md_text)
         if args.json:
             print(json.dumps({'issues': issues, 'count': len(issues)}, ensure_ascii=False))
         elif issues:
-            print(f'\n⚠️  发现 {len(issues)} 处全角半角问题:\n')
+            print(f'\\n⚠️  发现 {len(issues)} 处全角半角问题:\\n')
             for issue in issues:
                 print(f'  行{issue["line"]}: [{issue["type"]}] "{issue["char"]}"')
-                print(f'        上下文: …{issue["context"]}…\n')
+                print(f'        上下文: …{issue["context"]}…\\n')
         else:
             print('✅ 未发现全角半角问题')
         sys.exit(0)
-    
+
+    # --profile: 企业资料库自动注入
+    if args.profile:
+        if args.profile == 'auto':
+            placeholders = load_company_profile()
+        else:
+            placeholders = load_company_profile(args.profile)
+        if placeholders:
+            inject_count = sum(1 for v in placeholders.values() if v)
+            print(f'📋 企业资料库加载完成: {inject_count} 个字段可用')
+            md_text = inject_profile(md_text, placeholders)
+        else:
+            print('⚠️  企业资料库未找到有效数据，请先填写 company_profile/ 目录下的模板文件')
+
     output = args.output or os.path.splitext(args.input)[0] + '_排版.docx'
-    md_to_docx(md_text, output, auto_fix=not args.no_fix, dark_mode=args.暗标, config=config, no_toc=args.no_toc)
+    md_to_docx(md_text, output, auto_fix=not args.no_fix, dark_mode=args.暗标,
+               config=config, no_toc=args.no_toc, use_mermaid_api=args.mermaid_api)
     print(f'✅ 已生成: {output}')
-    
+
     if args.check:
         results = check_docx(output, config=config)
         if args.json: print(json.dumps(results, ensure_ascii=False, indent=2))
         else: print_check_report(results)
     sys.exit(0)
+
 
 if __name__ == '__main__': main()
