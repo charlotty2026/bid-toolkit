@@ -14,7 +14,7 @@ detection_rules:
     name: "工程类"
     template: "engineering_outline.md"
     format_template: "engineering.yaml"
-    confidence_threshold: 3  # 至少命中3个信号才定性
+    confidence_threshold: 5  # 至少命中5个信号才定性（2个强信号+1个中信号=5分，防误触）
     
     keywords:
       # 强信号（每个算2分）
@@ -60,7 +60,7 @@ detection_rules:
     name: "货物类"
     template: "goods_outline.md"
     format_template: "goods.yaml"
-    confidence_threshold: 3
+    confidence_threshold: 5
     
     keywords:
       strong:
@@ -104,7 +104,7 @@ detection_rules:
     name: "服务类"
     template: "service_outline.md"
     format_template: "government.yaml"
-    confidence_threshold: 3
+    confidence_threshold: 5
     
     keywords:
       strong:

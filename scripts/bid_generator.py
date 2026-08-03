@@ -181,7 +181,7 @@ def detect_bid_type(rfp_text: str, detection_yaml_path: Path) -> tuple[str, dict
         if exclude_hits > 5:
             score = max(0, score - exclude_hits)
 
-        threshold = rule.get('confidence_threshold', 3)
+        threshold = rule.get('confidence_threshold', 5)
         scores[type_key] = score
         details[type_key] = {
             'score': score,

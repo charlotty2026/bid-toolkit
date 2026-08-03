@@ -1200,14 +1200,15 @@ def detect_industry(text, detection_path=None):
             if count > 0:
                 score += count * 1
 
-        # 排除条件
+        # 排除条件：排除信号 > 2倍正向信号时才清零
+        # 避免"出现少量排除词就全盘否定"
         exclude = type_config.get('exclude_if_dominant', [])
         exclude_score = 0
         for kw in exclude:
             exclude_score += text_lower.count(kw.lower())
 
-        if exclude_score > score:
-            score = 0  # 排除信号压倒性，不判定为此类型
+        if exclude_score > score * 2:
+            score = 0  # 排除信号压倒性（>2倍正向），不判定为此类型
 
         threshold = type_config.get('confidence_threshold', 3)
         if score >= threshold:
