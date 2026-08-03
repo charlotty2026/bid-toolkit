@@ -706,6 +706,7 @@ def strip_md_residue(text):
 
 
 def add_body(doc, text, body_spec):
+    text = strip_md_residue(text)
     p = doc.add_paragraph(text, style='Normal')
     for run in p.runs: set_run_font(run, body_spec['font'], body_spec['size'], body_spec['bold'])
     p.paragraph_format.first_line_indent = Twips(480)
@@ -1241,7 +1242,7 @@ def run_deflavor_scan(text, mode='bid'):
     集成 ai-flavor-radar 到流水线，检测AI味文本并输出报告。
     """
     # 添加 ai-flavor-radar 到路径
-    radar_path = Path('/tmp/ai-flavor-radar')
+    radar_path = Path(os.environ.get("AI_FLAVOR_RADAR_PATH", "/tmp/ai-flavor-radar"))
     if not radar_path.exists():
         print('⚠️  AI味雷达未安装 (路径: /tmp/ai-flavor-radar)')
         print('💡  安装: git clone https://github.com/charlotty2026/ai-flavor-radar.git /tmp/ai-flavor-radar')
