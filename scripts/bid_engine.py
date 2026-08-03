@@ -696,17 +696,16 @@ def check_heading_styles(doc):
 
 def strip_md_residue(text):
     """去除Markdown残留语法标记"""
-    text = re.sub(r'!\\[([^\\]]*)\\]\\(([^)]*)\\)', r'[图片: \\1]', text)
-    text = re.sub(r'\\[([^\\]]+)\\]\\(([^)]+)\\)', r'\\1（\\2）', text)
-    text = re.sub(r'~~(.+?)~~', r'\\1', text)
-    text = re.sub(r'\\*\\*(.+?)\\*\\*', r'\\1', text)
-    text = re.sub(r'`([^`]+)`', r'\\1', text)
+    text = re.sub(r'!\[([^\]]*)\]\(([^)]*)\)', r'[图片: \1]', text)
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1（\2）', text)
+    text = re.sub(r'~~(.+?)~~', r'\1', text)
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'`([^`]+)`', r'\1', text)
     text = re.sub(r'^>\\s?', '', text, flags=re.MULTILINE)
     return text
 
 
 def add_body(doc, text, body_spec):
-    text = strip_md_residue(text)
     p = doc.add_paragraph(text, style='Normal')
     for run in p.runs: set_run_font(run, body_spec['font'], body_spec['size'], body_spec['bold'])
     p.paragraph_format.first_line_indent = Twips(480)
@@ -1152,6 +1151,134 @@ def print_check_report(results):
         print(f'\\\\n📈 共 {total_issues} 个问题（{nf} 个错误, {nw} 个警告）')
 
 
+# ===== 行业自动检测 =====
+def detect_industry(text, detection_path=None):
+    """从招标文件文本中自动检测行业类型，返回模板名称
+
+    使用 bid_type_detection.yaml 中的关键词规则打分，
+    强信号2分，中信号1分，达到阈值即定性。
+    """
+    if detection_path is None:
+        detection_path = Path(__file__).parent.parent / 'templates' / 'bid_type_detection.yaml'
+    if not detection_path.exists():
+        return None
+
+    if yaml is None:
+        print('⚠️  未安装pyyaml，无法使用行业检测')
+        return None
+
+    try:
+        with open(detection_path, 'r', encoding='utf-8') as f:
+            rules = yaml.safe_load(f)
+    except Exception as e:
+        print(f'⚠️  行业检测规则加载失败: {e}')
+        return None
+
+    detection_rules = rules.get('detection_rules', {})
+    if not detection_rules:
+        return None
+
+    text_lower = text.lower()
+    scores = {}
+
+    for type_key, type_config in detection_rules.items():
+        if not isinstance(type_config, dict):
+            continue
+        score = 0
+        keywords = type_config.get('keywords', {})
+
+        # 强信号：每个2分
+        for kw in keywords.get('strong', []):
+            count = text_lower.count(kw.lower())
+            if count > 0:
+                score += count * 2
+
+        # 中信号：每个1分
+        for kw in keywords.get('medium', []):
+            count = text_lower.count(kw.lower())
+            if count > 0:
+                score += count * 1
+
+        # 排除条件
+        exclude = type_config.get('exclude_if_dominant', [])
+        exclude_score = 0
+        for kw in exclude:
+            exclude_score += text_lower.count(kw.lower())
+
+        if exclude_score > score:
+            score = 0  # 排除信号压倒性，不判定为此类型
+
+        threshold = type_config.get('confidence_threshold', 3)
+        if score >= threshold:
+            scores[type_key] = score
+
+    if not scores:
+        return None
+
+    # 取最高分
+    best_type = max(scores, key=scores.get)
+    template_map = {
+        'engineering': 'engineering',
+        'goods': 'government',  # 货物标用政府采购模板
+        'service': 'government',  # 服务标用政府采购模板
+    }
+
+    # 显示检测结果
+    template_name = template_map.get(best_type, 'government')
+    type_name = {
+        'engineering': '工程类',
+        'goods': '货物类',
+        'service': '服务类',
+    }.get(best_type, best_type)
+    print(f'🔍 行业自动检测: {type_name} (得分: {scores[best_type]}, 模板: {template_name})')
+
+    return template_name
+
+
+def run_deflavor_scan(text, mode='bid'):
+    """对文本运行AI味雷达检测，返回检测报告
+
+    集成 ai-flavor-radar 到流水线，检测AI味文本并输出报告。
+    """
+    # 添加 ai-flavor-radar 到路径
+    radar_path = Path('/tmp/ai-flavor-radar')
+    if not radar_path.exists():
+        print('⚠️  AI味雷达未安装 (路径: /tmp/ai-flavor-radar)')
+        print('💡  安装: git clone https://github.com/charlotty2026/ai-flavor-radar.git /tmp/ai-flavor-radar')
+        return None
+
+    sys.path.insert(0, str(radar_path))
+    try:
+        from ai_flavor_radar import FlavorRadar, format_text_report
+    except ImportError as e:
+        print(f'⚠️  AI味雷达导入失败: {e}')
+        return None
+
+    radar = FlavorRadar(mode=mode)
+    result = radar.scan(text, file_path='<bid_engine>')
+
+    print('\n' + '=' * 60)
+    print('🧪 AI味雷达检测报告')
+    print('=' * 60)
+    print(f'📊 评分: {result.score}/100 ({result.grade})')
+    print(f'🔍 命中: {result.hit_count} 处 (fatal={result.fatal_count}, high={result.high_count}, medium={result.medium_count}, low={result.low_count})')
+    print()
+
+    if result.hits:
+        report = format_text_report(result, use_color=False)
+        # 取前20行精简展示
+        lines = report.split('\n')
+        for line in lines[:30]:
+            print(line)
+        if len(lines) > 30:
+            print(f'  ... 还有 {len(lines) - 30} 行 ...')
+    else:
+        print('✅ 未检测到AI味问题')
+
+    print('=' * 60)
+    return result
+
+
 # ===== 命令行入口 =====
 def main():
     parser = argparse.ArgumentParser(description='标书自动化引擎 v3.6')
@@ -1164,6 +1291,10 @@ def main():
     parser.add_argument('--template', type=str, default=None,
                         choices=['government', 'enterprise', 'engineering'],
                         help='使用预设模板: government=政府采购, enterprise=企业投标, engineering=工程类')
+    parser.add_argument('--detect-industry', action='store_true', default=False,
+                        help='自动检测行业类型并加载对应模板（覆盖--template）')
+    parser.add_argument('--deflavor', action='store_true', default=False,
+                        help='生成后自动运行AI味雷达检测，输出去AI味报告')
     parser.add_argument('--config', type=str, default=None, help='指定config.yaml配置文件路径')
     parser.add_argument('--json', action='store_true', help='JSON输出')
     parser.add_argument('--no-toc', action='store_true', help='不插入目录域（默认自动生成目录）')
@@ -1232,6 +1363,18 @@ def main():
         print('   bid list                                # 查看所有命令')
         sys.exit(1)
 
+    # --detect-industry: 自动检测行业类型并加载对应模板（覆盖--template）
+    if args.detect_industry and args.input and os.path.exists(args.input):
+        # 读取文件头2000字用于检测（足够判断行业类型）
+        with open(args.input, 'r', encoding='utf-8') as f:
+            head_text = f.read(8000)
+        detected_template = detect_industry(head_text)
+        if detected_template:
+            args.template = detected_template
+            print(f'📋 自动匹配模板: {detected_template}')
+        else:
+            print('⚠️  未能自动识别行业类型，使用默认配置')
+
     config = load_config(config_path=args.config, template_name=args.template)
 
     if args.check and args.input.endswith('.docx'):
@@ -1272,6 +1415,10 @@ def main():
     md_to_docx(md_text, output, auto_fix=not args.no_fix, dark_mode=args.暗标,
                config=config, no_toc=args.no_toc, use_mermaid_api=args.mermaid_api)
     print(f'✅ 已生成: {output}')
+
+    # --deflavor: 生成后自动运行AI味雷达检测
+    if args.deflavor:
+        run_deflavor_scan(md_text, mode='bid')
 
     if args.check:
         results = check_docx(output, config=config)
