@@ -13,8 +13,8 @@ from datetime import datetime
 from collections import defaultdict
 
 # 配置
-BASE_DIR = "/opt/internal/tools/bid-toolkit-opensource"
-SCAN_DATE = "2026-07-27"
+BASE_DIR = os.environ.get("BID_TOOLKIT_BASE_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SCAN_DATE = datetime.now().strftime("%Y-%m-%d")
 
 # 15个敏感词（internal_team代号/内部称呼）
 SENSITIVE_WORDS = [
