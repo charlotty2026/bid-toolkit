@@ -1304,6 +1304,10 @@ def main():
     parser.add_argument('--check-priority', type=str, default=None, help='P0/P1/P2合规分级检查')
     parser.add_argument('--profile', type=str, nargs='?', const='auto', default=None,
                         help='自动注入企业资料库信息。接受路径参数，不加参数使用内置company_profile/')
+    parser.add_argument('--check-commitments', type=str, nargs='?', const='auto', default=None,
+                        help='承诺链三源追踪：扫描标书中的承诺并对照企业资料库验证证据支撑')
+    parser.add_argument('--map-clauses', nargs=2, metavar=('TENDER', 'BID'),
+                        help='条款-方案映射审计：传招标文件路径和方案文件路径，自动分析评分覆盖')
     parser.add_argument('--mermaid-api', action='store_true', default=False,
                         help='使用mermaid.ink网络API渲染图表（不依赖本地mmdc命令）')
     args = parser.parse_args()
@@ -1352,6 +1356,30 @@ def main():
         print('=' * 60)
         sys.exit(0)
 
+    if args.map_clauses:
+        tender_file, bid_file = args.map_clauses
+        if not os.path.exists(tender_file):
+            print(f'❌ 招标文件不存在: {tender_file}'); sys.exit(1)
+        if not os.path.exists(bid_file):
+            print(f'❌ 方案文件不存在: {bid_file}'); sys.exit(1)
+        if 'clause_mapper' not in sys.modules:
+            try:
+                from scripts.clause_mapper import parse_tender_file, parse_scoring_table, detect_chapters, map_clauses_to_chapters, format_mapping_report
+            except ImportError:
+                sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+                from scripts.clause_mapper import parse_tender_file, parse_scoring_table, detect_chapters, map_clauses_to_chapters, format_mapping_report
+        tender_text = parse_tender_file(tender_file)
+        clauses = parse_scoring_table(tender_text)
+        if not clauses:
+            print('❌ 未识别到评分条款，请检查招标文件格式')
+            sys.exit(1)
+        bid_text = parse_tender_file(bid_file)
+        chapters = detect_chapters(bid_text)
+        mappings = map_clauses_to_chapters(clauses, chapters)
+        report = format_mapping_report(mappings, chapters)
+        print(report)
+        sys.exit(0)
+
     if not args.input or not os.path.exists(args.input):
         if not args.input:
             print('❌ 请指定Markdown文件')
@@ -1361,6 +1389,7 @@ def main():
         print('   bid engine samples/某外包项目标书.md    # 用内置示例')
         print('   bid engine 你的标书.md -o 输出.docx       # 用你自己的文件')
         print('   bid engine 你的标书.md --profile          # 自动注入企业资料')
+        print('   bid engine 你的标书.md --check-commitments  # 承诺链三源追踪审计')
         print('   bid engine 你的标书.md --mermaid-api      # 使用网络API渲染图表')
         print('   bid list                                # 查看所有命令')
         sys.exit(1)
@@ -1412,6 +1441,21 @@ def main():
             md_text = inject_profile(md_text, placeholders)
         else:
             print('⚠️  企业资料库未找到有效数据，请先填写 company_profile/ 目录下的模板文件')
+
+    # --check-commitments: 承诺链三源追踪
+    if args.check_commitments:
+        profile_dir = 'company_profile' if args.check_commitments == 'auto' else args.check_commitments
+        # 加载承诺链扫描器
+        try:
+            from commitment_scanner import scan_commitments, load_profile, format_report
+        except ImportError:
+            sys.path.insert(0, str(Path(__file__).parent.parent / 'scripts'))
+            from commitment_scanner import scan_commitments, load_profile, format_report
+        profile_data = load_profile(profile_dir)
+        results = scan_commitments(md_text, profile_data)
+        report = format_report(results, profile_data)
+        print(report)
+        sys.exit(0)
 
     output = args.output or os.path.splitext(args.input)[0] + '_排版.docx'
     md_to_docx(md_text, output, auto_fix=not args.no_fix, dark_mode=args.暗标,

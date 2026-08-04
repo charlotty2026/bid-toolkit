@@ -163,12 +163,25 @@ def cmd_review(args):
 
 
 def cmd_desense(args):
-    """敏感信息脱敏扫描"""
-    mod = _load_script("desensitization_scan.py")
-    print(f"🔍 脱敏扫描: {args.file}")
-    # 这个脚本没有 main()，直接调 generate_report
-    report = mod.generate_report()
-    mod.print_report(report)
+    """AI味检测 + 敏感信息脱敏扫描"""
+    # 优先调用 AI味雷达（检测AI文风）
+    mod = _load_script("ai_flavor_radar.py")
+    print(f"🔍 AI味雷达扫描: {args.file}")
+    print(f"{'='*60}")
+    extra_args = []
+    if getattr(args, "no_color", False):
+        extra_args.append("--no-color")
+    if getattr(args, "no_examples", False):
+        extra_args.append("--no-examples")
+    mod.run_scan(args.file, mode=args.mode, fmt=args.format, output=args.output, extra_args=extra_args)
+    print()
+
+    # 敏感信息脱敏扫描（原功能）
+    desense_mod = _load_script("desensitization_scan.py")
+    print(f"🔍 敏感信息扫描: {args.file}")
+    print(f"{'='*60}")
+    report = desense_mod.generate_report()
+    desense_mod.print_report(report)
 
 
 def cmd_watermark(args):
@@ -179,6 +192,26 @@ def cmd_watermark(args):
                       text=args.text, font=args.font,
                       color=args.color, opacity=args.opacity)
     print(f"✅ 水印 \"{args.text}\" 已添加到 {args.output}")
+
+
+def cmd_commitments(args):
+    """承诺链三源追踪：扫描标书中的承诺并对照企业资料库验证"""
+    # 承诺链脚本在 scripts/ 根目录（不是 bid_toolkit/scripts/）
+    scripts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
+    path = os.path.join(scripts_dir, "commitment_scanner.py")
+    if not os.path.isfile(path):
+        print(f"❌ 找不到脚本: {path}")
+        sys.exit(1)
+    spec = importlib.util.spec_from_file_location("commitment_scanner", path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod.__name__] = mod
+    spec.loader.exec_module(mod)
+    sys.argv = ["commitment_scanner.py", args.file]
+    if args.profile:
+        sys.argv.extend(["--profile", args.profile])
+    if args.output:
+        sys.argv.extend(["--report", args.output])
+    mod.main()
 
 
 def cmd_materials(args):
@@ -206,6 +239,27 @@ def cmd_gui(args):
         print('请运行: pip install "bid-toolkit[desktop]"')
         sys.exit(1)
 
+def cmd_map_clauses(args):
+    """条款-方案映射审计：招标文件评分条款 → 方案章节覆盖分析"""
+    scripts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
+    path = os.path.join(scripts_dir, "clause_mapper.py")
+    if not os.path.isfile(path):
+        print(f"❌ 找不到脚本: {path}")
+        sys.exit(1)
+    spec = importlib.util.spec_from_file_location("clause_mapper", path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod.__name__] = mod
+    spec.loader.exec_module(mod)
+    sys.argv = ["clause_mapper.py", args.tender_file]
+    if args.bid_file:
+        sys.argv.extend(["-b", args.bid_file])
+    if args.report:
+        sys.argv.extend(["--report", args.report])
+    if getattr(args, "json_output", None):
+        sys.argv.extend(["--json", args.json_output])
+    mod.main()
+
+
 def cmd_list(args=None):
     """列出所有可用工具"""
     tools = [
@@ -213,8 +267,10 @@ def cmd_list(args=None):
         ("check",    "标书格式自检 + 评分项覆盖", "bid check input.docx --coverage"),
         ("review",   "招标文件风险扫描（三层审标）", "bid review 招标文件.pdf -o report.md"),
         ("rfp",      "招标文件生成器",           "bid rfp --type services --project XX项目"),
-        ("desense",  "敏感信息脱敏扫描",         "bid desense input.docx"),
-        ("watermark","Word文档添加文字水印",      "bid watermark input.docx output.docx -t 仅供参考"),
+        ("desense",  "AI味检测 + 敏感信息脱敏扫描", "bid desense 投标方案.md --mode bid"),
+        ("commitments", "承诺链三源追踪审计", "bid commitments 标书.md --profile company_profile"),
+        ("map-clauses", "条款-方案映射审计", "bid map-clauses 招标文件.md 方案.md"),
+        ("watermark", "Word文档添加文字水印", "bid watermark input.docx output.docx -t 仅供参考"),
         ("materials","标书素材库管家（自动分类整理+材料清单）", "bid materials analyze 素材库目录"),
         ("gui",      "启动桌面图形界面",           "bid gui"),
     ]
@@ -261,8 +317,15 @@ def main():
     p.add_argument("--output", help="输出目录")
 
     # desense
-    p = sub.add_parser("desense", help="敏感信息脱敏扫描")
-    p.add_argument("file", help="输入文件路径")
+    p = sub.add_parser("desense", help="AI味检测 + 敏感信息脱敏扫描")
+    p.add_argument("file", help="输入文件路径（.md/.txt/.docx）")
+    p.add_argument("--mode", choices=["bid", "social", "xiaohongshu", "email", "paper"], default="bid",
+                   help="检测模式: bid=投标方案(默认), social=自媒体, xiaohongshu=小红书, email=邮件, paper=学术论文")
+    p.add_argument("--format", choices=["text", "json", "markdown", "docx"], default="text",
+                   help="输出格式: text(默认), json, markdown, docx(Word修订标记)")
+    p.add_argument("-o", "--output", help="输出文件路径（docx格式必填）")
+    p.add_argument("--no-color", action="store_true", help="禁用终端颜色")
+    p.add_argument("--no-examples", action="store_true", help="不显示改前→改后示范")
 
     # watermark
     p = sub.add_parser("watermark", help="Word文档添加文字水印")
@@ -282,6 +345,19 @@ def main():
     p.add_argument("--force", action="store_true", help="apply时跳过needs_review强制执行")
     p.add_argument("-v", "--verbose", action="store_true", help="apply时显示移动明细")
     p.add_argument("--llm", action="store_true", help="learn时开启AI建议")
+
+    # commitments
+    p = sub.add_parser("commitments", help="承诺链三源追踪审计")
+    p.add_argument("file", help="标书文件路径（.md/.txt）")
+    p.add_argument("--profile", "-p", default="company_profile", help="企业资料库目录 (默认: company_profile/)")
+    p.add_argument("--output", "-o", help="输出审计报告到文件")
+
+    # map-clauses
+    p = sub.add_parser("map-clauses", help="条款-方案映射审计")
+    p.add_argument("tender_file", help="招标文件路径（.md/.txt）")
+    p.add_argument("bid_file", nargs="?", default=None, help="方案文件路径（可选，不指定则只解析评分表）")
+    p.add_argument("--report", "-r", help="导出报告路径")
+    p.add_argument("--json", dest="json_output", help="导出 JSON 路径")
 
     # list
     sub.add_parser("list", help="列出所有可用工具")
@@ -307,6 +383,10 @@ def main():
         cmd_watermark(args)
     elif args.command == "materials":
         cmd_materials(args)
+    elif args.command == "commitments":
+        cmd_commitments(args)
+    elif args.command == "map-clauses":
+        cmd_map_clauses(args)
     elif args.command == "list":
         cmd_list()
     elif args.command == "gui":
