@@ -7,3 +7,6 @@ dist/
 .bak
 *.bak
 *.backup.*
+desensitization_report.json
+test_profile/
+format_config.yaml

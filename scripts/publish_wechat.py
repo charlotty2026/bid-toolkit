@@ -20,7 +20,7 @@ import requests
 import sys
 import os
 
-# 微信公众号凭据必须从环境变量读取，禁止硬编码（开源红线）
+# 微信公众号凭据必须从环境变量读取，禁止硬编码到代码（开源红线）
 APP_ID = os.environ.get("WECHAT_APP_ID", "")
 APP_SECRET = os.environ.get("WECHAT_APP_SECRET", "")
 
