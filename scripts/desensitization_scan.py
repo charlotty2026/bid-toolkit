@@ -16,43 +16,35 @@ from collections import defaultdict
 BASE_DIR = os.environ.get("BID_TOOLKIT_BASE_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCAN_DATE = datetime.now().strftime("%Y-%m-%d")
 
-# 15个敏感词（internal_team代号/内部称呼）
-SENSITIVE_WORDS = [
-    "internal_code",
-    "internal_team",
-    "internal",
-    "agent_alpha",
-    "agent_beta",
-    "agent_gamma",
-    "agent_delta",
-    "agent_epsilon",
-    "agent_zeta",
-    "pet_name",
-    "agent_eta",
-    "agent_theta",
-    "owner_name",
-    "internal_motto",
-]
 
-# 额外隐私词（扫描中发现的）
-EXTRA_PRIVACY_WORDS = [
-    "owner",
-    "owner",
-    "侵掠如火",
-    "快枪手",
-    "审核工具A",
-    "审核工具B",
-    "自动化工具",
-    "大明",
-    "沪BH7T98",
-    "兰州百合干",
-    "维护者",
-    "验证人",
-    "测试人",
-]
+def _load_words():
+    """从外部配置加载敏感词，词库不进git。
+    优先级：环境变量 BID_TOOLKIT_SENSITIVE_WORDS（JSON文件路径）
+           > 仓库外配置 ~/.config/bid-toolkit/sensitive_words.json
+           > 仓库内示例 sensitive_words.example.json（仅通用词）
+    """
+    candidates = []
+    env_path = os.environ.get("BID_TOOLKIT_SENSITIVE_WORDS")
+    if env_path:
+        candidates.append(env_path)
+    candidates.append(os.path.expanduser("~/.config/bid-toolkit/sensitive_words.json"))
+    candidates.append(os.path.join(BASE_DIR, "sensitive_words.example.json"))
+    for path in candidates:
+        if path and os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                return (
+                    cfg.get("sensitive", []),
+                    cfg.get("extra_privacy", []),
+                    cfg.get("record", []),
+                )
+            except (json.JSONDecodeError, OSError):
+                continue
+    return [], [], []
 
-# 不算敏感但需记录的
-RECORD_WORDS = ["charlotty2026"]
+
+SENSITIVE_WORDS, EXTRA_PRIVACY_WORDS, RECORD_WORDS = _load_words()
 
 
 def grep_scan(word, base_dir):
@@ -117,7 +109,7 @@ def generate_report():
     # === 第一节：15个核心敏感词 ===
     section1 = {
         "title": "第一节：15个核心敏感词扫描",
-        "description": "扫描internal_team代号、内部称呼、Agent名字等绝对不可外泄的词汇",
+        "description": "扫描内部代号、内部称呼等不可外泄的词汇",
         "items": [],
     }
     for word in SENSITIVE_WORDS:
@@ -231,7 +223,7 @@ def print_report(report):
     else:
         print("\n  综合结论: 发现隐私泄露！必须修复后才能开源发布。")
         print("  重点文件: rules/bid_rules.md（含大量内部代号、Agent角色、车牌号）")
-        print("  重点文件: docs/RFP验证报告.md（含'owner'称呼）")
+        print("  重点文件: 请根据本地扫描结果中的命中路径检查")
     print("=" * 70)
 
     # 输出JSON供存档
