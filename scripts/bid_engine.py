@@ -148,12 +148,12 @@ def build_specs(config):
 
 # ===== 下划线/占位符保留逻辑 =====
 UNDERLINE_PATTERNS = [
-    (r'(致[：:]\\s*)(_{3,})(\\s*（[^）]+）)', r'\\1{value}\\3'),
-    (r'(根据[：:]\\s*)(_{3,})(\\s*（[^）]+）)', r'\\1{value}\\3'),
-    (r'(项目名称[：:]\\s*)(_{3,})', r'\\1{value}'),
-    (r'([：:]\\s*)(_{3,})(\\s*（[^）]+）)', r'\\1{value}\\3'),
-    (r'([：:]\\s*)(_{3,})', r'\\1{value}'),
-    (r'（(招标人|投标人|供应商|采购人|代理机构|甲方|乙方|丙方)）', r'（\\1）'),
+    (r'(致[：:]\s*)(_{3,})(\s*（[^）]+）)', r'\1{value}\3'),
+    (r'(根据[：:]\s*)(_{3,})(\s*（[^）]+）)', r'\1{value}\3'),
+    (r'(项目名称[：:]\s*)(_{3,})', r'\1{value}'),
+    (r'([：:]\s*)(_{3,})(\s*（[^）]+）)', r'\1{value}\3'),
+    (r'([：:]\s*)(_{3,})', r'\1{value}'),
+    (r'（(招标人|投标人|供应商|采购人|代理机构|甲方|乙方|丙方)）', r'（\1）'),
 ]
 
 
@@ -161,7 +161,7 @@ def preserve_underlines(text, replacements=None):
     """保留下划线占位符的格式，同时支持填入实际值。"""
     if not replacements:
         return text
-    lines = text.split('\\n')
+    lines = text.split('\n')
     result = []
     for line in lines:
         for pattern, template in UNDERLINE_PATTERNS:
@@ -170,19 +170,19 @@ def preserve_underlines(text, replacements=None):
                 for key, value in replacements.items():
                     if key in line:
                         line = re.sub(
-                            r'(' + re.escape(key) + r'\\s*)(_{3,})(\\s*（[^）]+）)',
+                            r'(' + re.escape(key) + r'\s*)(_{3,})(\s*（[^）]+）)',
                             lambda m: m.group(1) + value + m.group(3),
                             line
                         )
                         if '（' not in line:
                             line = re.sub(
-                                r'(' + re.escape(key) + r'\\s*)(_{3,})',
+                                r'(' + re.escape(key) + r'\s*)(_{3,})',
                                 lambda m: m.group(1) + value,
                                 line
                             )
                         break
         result.append(line)
-    return '\\n'.join(result)
+    return '\n'.join(result)
 
 
 # ===== 文本格式化工具 =====
@@ -259,19 +259,19 @@ def fix_punctuation(text):
             changes += 1
         else:
             result.append(ch)
-        if '\\u4e00' <= ch <= '\\u9fff' or '\\u3000' <= ch <= '\\u303f': in_cn = True
+        if '\u4e00' <= ch <= '\u9fff' or '\u3000' <= ch <= '\u303f': in_cn = True
         elif ch.isascii() and ch.isalpha(): in_cn = False
     return ''.join(result), changes
 
 
 def scan_punctuation(text):
     issues = []
-    for i, line in enumerate(text.split('\\n')):
+    for i, line in enumerate(text.split('\n')):
         for half, full in HALF_TO_FULL.items():
-            for m in re.finditer(rf'[\\u4e00-\\u9fff]{re.escape(half)}[\\u4e00-\\u9fff]', line):
+            for m in re.finditer(rf'[\u4e00-\u9fff]{re.escape(half)}[\u4e00-\u9fff]', line):
                 issues.append({'line': i+1, 'type': '半角标点混入中文', 'char': half, 'should_be': full,
                     'context': line[max(0,m.start()-8):m.end()+8]})
-        for m in re.finditer(r'[\\uff10-\\uff19\\uff21-\\uff3a\\uff41-\\uff5a]+', line):
+        for m in re.finditer(r'[\uff10-\uff19\uff21-\uff3a\uff41-\uff5a]+', line):
             issues.append({'line': i+1, 'type': '全角数字/字母', 'char': m.group(),
                 'context': line[max(0,m.start()-5):m.end()+5]})
     return issues
@@ -283,7 +283,7 @@ def parse_md_table(lines, start_idx):
     if idx < len(lines) and lines[idx].strip().startswith('|'):
         headers = [c.strip() for c in lines[idx].strip().strip('|').split('|')]
         idx += 1
-    if idx < len(lines) and re.match(r'^[\\s|\\-:]+$', lines[idx]): idx += 1
+    if idx < len(lines) and re.match(r'^[\s|\-:]+$', lines[idx]): idx += 1
     while idx < len(lines) and lines[idx].strip().startswith('|'):
         rows.append([c.strip() for c in lines[idx].strip().strip('|').split('|')])
         idx += 1
@@ -431,7 +431,7 @@ def add_mermaid_block(doc, code, body_spec, use_api=False):
         else:
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.add_run(f'[Mermaid图表渲染失败]\\n{code[:200]}')
+            run = p.add_run(f'[Mermaid图表渲染失败]\n{code[:200]}')
             set_run_font(run, body_spec['font'], body_spec['size'] - 1, False)
             run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
 
@@ -472,7 +472,7 @@ def load_company_profile(profile_dir=None):
     if info_file.exists():
         text = info_file.read_text(encoding='utf-8')
         # 提取公司名称
-        m = re.search(r'## 公司名称\\n\\n(.+)', text)
+        m = re.search(r'## 公司名称\n\n(.+)', text)
         if m:
             name = m.group(1).strip()
             if not name.startswith('***'):
@@ -491,7 +491,7 @@ def load_company_profile(profile_dir=None):
             if not cap.startswith('***'):
                 profile['registered_capital'] = cap
         # 提取公司简介
-        m = re.search(r'## 公司简介\\n\\n(.+?)(?:\\n##|$)', text, re.DOTALL)
+        m = re.search(r'## 公司简介\n\n(.+?)(?:\n##|$)', text, re.DOTALL)
         if m:
             intro = m.group(1).strip()
             if not intro.startswith('***'):
@@ -503,7 +503,7 @@ def load_company_profile(profile_dir=None):
         text = qual_file.read_text(encoding='utf-8')
         quals = []
         in_list = False
-        for line in text.split('\\n'):
+        for line in text.split('\n'):
             line = line.strip()
             if line.startswith('- '):
                 quals.append(line[2:])
@@ -511,30 +511,30 @@ def load_company_profile(profile_dir=None):
             elif in_list and line:
                 quals.append(line)
         if quals:
-            profile['qualifications'] = '\\n'.join(quals)
+            profile['qualifications'] = '\n'.join(quals)
 
     # 读取团队信息
     team_file = profile_dir / 'team.md'
     if team_file.exists():
         text = team_file.read_text(encoding='utf-8')
         members = []
-        for line in text.split('\\n'):
+        for line in text.split('\n'):
             line = line.strip()
             if line.startswith('- 姓名') or line.startswith('- 职务'):
                 members.append(line)
         if members:
-            profile['team_members'] = '\\n'.join(members)
+            profile['team_members'] = '\n'.join(members)
 
     # 读取业绩信息
     perf_file = profile_dir / 'performance.md'
     if perf_file.exists():
         text = perf_file.read_text(encoding='utf-8')
         projs = []
-        for line in text.split('\\n'):
+        for line in text.split('\n'):
             if line.strip().startswith('- '):
                 projs.append(line.strip()[2:])
         if projs:
-            profile['performance'] = '\\n'.join(projs)
+            profile['performance'] = '\n'.join(projs)
 
     # 构建占位符替换表
     placeholders = {}
@@ -669,7 +669,7 @@ def check_heading_styles(doc):
         is_bold = any(run.bold for run in para.runs if run.bold is not None)
         has_numbering = bool(re.match(
             r'^(第[一二三四五六七八九十百]+[章节条款]|[一二三四五六七八九十]+[、．.]'
-            r'|\\d+[\\.\\、]|\\d+\\.\\d+|[\\(（]\\d+[\\)）])',
+            r'|\d+[\.\、]|\d+\.\d+|[\(（]\d+[\)）])',
             text
         ))
 
@@ -701,7 +701,7 @@ def strip_md_residue(text):
     text = re.sub(r'~~(.+?)~~', r'\1', text)
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
     text = re.sub(r'`([^`]+)`', r'\1', text)
-    text = re.sub(r'^>\\s?', '', text, flags=re.MULTILINE)
+    text = re.sub(r'^>\s?', '', text, flags=re.MULTILINE)
     return text
 
 
@@ -821,7 +821,7 @@ def check_typos(text):
                 break
             ctx_start = max(0, pos - 10)
             ctx_end = min(len(text), pos + len(wrong) + 10)
-            context = text[ctx_start:ctx_end].replace('\\n', ' ')
+            context = text[ctx_start:ctx_end].replace('\n', ' ')
             issues.append({
                 'type': f'错别字「{wrong}」应为「{correct}」',
                 'word': wrong,
@@ -835,16 +835,16 @@ def check_typos(text):
 
 CONSISTENCY_PATTERNS = {
     '投标有效期': [
-        r'投标有效期\\s*[:：为]?\\s*(\\d+)\\s*天',
-        r'有效期\\s*[:：为]?\\s*(\\d+)\\s*个?天',
+        r'投标有效期\s*[:：为]?\s*(\d+)\s*天',
+        r'有效期\s*[:：为]?\s*(\d+)\s*个?天',
     ],
     '总报价': [
-        r'(?:总报价|总[价金额计]|合计金额|报价总[价额])\\s*[:：为是]?\\s*(\\d[\\d,]*(?:\\.\\d+)?)\\s*(万元|元|万)',
-        r'投标(?:总)?报价\\s*[:：为是]?\\s*(\\d[\\d,]*(?:\\.\\d+)?)\\s*(万元|元|万)',
+        r'(?:总报价|总[价金额计]|合计金额|报价总[价额])\s*[:：为是]?\s*(\d[\d,]*(?:\.\d+)?)\s*(万元|元|万)',
+        r'投标(?:总)?报价\s*[:：为是]?\s*(\d[\d,]*(?:\.\d+)?)\s*(万元|元|万)',
     ],
     '人员总数': [
-        r'(?:总人数|人员[总数配置量]|配备人员)\\s*[:：为共]?\\s*(\\d+)\\s*人',
-        r'共\\s*(\\d+)\\s*人',
+        r'(?:总人数|人员[总数配置量]|配备人员)\s*[:：为共]?\s*(\d+)\s*人',
+        r'共\s*(\d+)\s*人',
     ],
 }
 
@@ -877,7 +877,7 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
         section.left_margin = Cm(page_spec['margin_left'])
         section.right_margin = Cm(page_spec['margin_right'])
 
-    lines = md_text.split('\\n')
+    lines = md_text.split('\n')
     i, in_table = 0, False
     table_headers, table_rows = [], []
     while i < len(lines):
@@ -890,7 +890,7 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
                 mermaid_code.append(lines[i])
                 i += 1
             i += 1
-            add_mermaid_block(doc, '\\n'.join(mermaid_code), body_spec, use_api=use_mermaid_api)
+            add_mermaid_block(doc, '\n'.join(mermaid_code), body_spec, use_api=use_mermaid_api)
             continue
         if line.strip().startswith('```') and not line.strip().startswith('```mermaid'):
             i += 1
@@ -910,7 +910,7 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
         if in_table:
             add_table(doc, table_headers, table_rows, table_spec)
             in_table = False
-        h_match = re.match(r'^(#{1,4})\\s+(.+)$', line)
+        h_match = re.match(r'^(#{1,4})\s+(.+)$', line)
         if h_match:
             add_heading(doc, h_match.group(2).strip(), len(h_match.group(1)), heading_spec)
             i += 1; continue
@@ -923,7 +923,7 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
                 run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
                 p.paragraph_format.left_indent = Cm(1)
             i += 1; continue
-        list_match = re.match(r'^(\\s*)[-*]\\s+(.+)$', line)
+        list_match = re.match(r'^(\s*)[-*]\s+(.+)$', line)
         if list_match:
             text = list_match.group(2).strip()
             p = doc.add_paragraph(style='List Bullet')
@@ -934,8 +934,8 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
             i += 1; continue
         if not line.strip():
             i += 1; continue
-        clean_text = re.sub(r'\\*\\*(.+?)\\*\\*', r'\\1', line)
-        clean_text = re.sub(r'\\*(.+?)\\*', r'\\1', clean_text)
+        clean_text = re.sub(r'\*\*(.+?)\*\*', r'\1', line)
+        clean_text = re.sub(r'\*(.+?)\*', r'\1', clean_text)
         add_body(doc, clean_text, body_spec, fill_mode)
         i += 1
     if in_table: add_table(doc, table_headers, table_rows, table_spec)
@@ -996,7 +996,7 @@ def check_docx(docx_path, config=None):
             results['pass'].append({'type': '禁用词检查', 'detail': '未发现禁用词'})
 
     # --- 检查3: 错别字 ---
-    full_text = '\\n'.join(p.text for p in doc.paragraphs)
+    full_text = '\n'.join(p.text for p in doc.paragraphs)
     typo_issues = check_typos(full_text)
     if typo_issues:
         for t in typo_issues:
@@ -1056,7 +1056,7 @@ def check_scoring_coverage(matrix_file, content_file):
     # 解析评分矩阵
     scoring_items = []
     current_item = {}
-    for line in matrix_text.split('\\n'):
+    for line in matrix_text.split('\n'):
         line = line.strip()
         if not line or line.startswith('#'):
             continue
@@ -1108,33 +1108,33 @@ def check_priority_issues(content_file, dark_mode=False):
         })
 
     p0_rules = [
-        ('投标人名称缺失', r'(?:投[标标]人|供应商|承[包包]商)[\\s：:]*[（(]?\\s*[）)]?\\s*$'),
-        ('项目名称缺失', r'(?:项目名称[：:])\\s*$'),
-        ('投标有效期未填写', r'(?:投标有效期|有效期)[\\s：:]*[（(]?\\s*[）)]?\\s*$'),
-        ('报价金额未填写', r'(?:总报价|投标报价|报价金额)[\\s：:]*[（(]?\\s*[）)]?'),
+        ('投标人名称缺失', r'(?:投[标标]人|供应商|承[包包]商)[\s：:]*[（(]?\s*[）)]?\s*$'),
+        ('项目名称缺失', r'(?:项目名称[：:])\s*$'),
+        ('投标有效期未填写', r'(?:投标有效期|有效期)[\s：:]*[（(]?\s*[）)]?\s*$'),
+        ('报价金额未填写', r'(?:总报价|投标报价|报价金额)[\s：:]*[（(]?\s*[）)]?'),
     ]
     p1_rules = [
-        ('联系人信息缺失', r'(?:联系人|授权代表|项目负责人)[\\s：:]*\\s*$'),
-        ('联系电话缺失', r'(?:联系电话|手机|电话)[\\s：:]*\\s*$'),
-        ('邮箱地址缺失', r'(?:邮箱|E-?mail|电子邮箱)[\\s：:]*\\s*$'),
-        ('服务承诺未写', r'(?:服务承诺|售后|质保期)[\\s：:]*\\s*$'),
+        ('联系人信息缺失', r'(?:联系人|授权代表|项目负责人)[\s：:]*\s*$'),
+        ('联系电话缺失', r'(?:联系电话|手机|电话)[\s：:]*\s*$'),
+        ('邮箱地址缺失', r'(?:邮箱|E-?mail|电子邮箱)[\s：:]*\s*$'),
+        ('服务承诺未写', r'(?:服务承诺|售后|质保期)[\s：:]*\s*$'),
     ]
     p2_rules = [
-        ('公司简介缺失', r'(?:公司简介|企业介绍)[\\s：:]*\\s*$'),
-        ('团队介绍缺失', r'(?:项目团队|人员配置|组织架构)[\\s：:]*\\s*$'),
-        ('类似业绩缺失', r'(?:类似项目|相关业绩|成功案例)[\\s：:]*\\s*$'),
+        ('公司简介缺失', r'(?:公司简介|企业介绍)[\s：:]*\s*$'),
+        ('团队介绍缺失', r'(?:项目团队|人员配置|组织架构)[\s：:]*\s*$'),
+        ('类似业绩缺失', r'(?:类似项目|相关业绩|成功案例)[\s：:]*\s*$'),
     ]
 
     issues = []
     for desc, pattern in p0_rules:
         for m in re.finditer(pattern, text, re.MULTILINE):
-            issues.append({'level': 'P0', 'desc': desc, 'match': m.group()[:50], 'line': text[:m.start()].count('\\n') + 1})
+            issues.append({'level': 'P0', 'desc': desc, 'match': m.group()[:50], 'line': text[:m.start()].count('\n') + 1})
     for desc, pattern in p1_rules:
         for m in re.finditer(pattern, text, re.MULTILINE):
-            issues.append({'level': 'P1', 'desc': desc, 'match': m.group()[:50], 'line': text[:m.start()].count('\\n') + 1})
+            issues.append({'level': 'P1', 'desc': desc, 'match': m.group()[:50], 'line': text[:m.start()].count('\n') + 1})
     for desc, pattern in p2_rules:
         for m in re.finditer(pattern, text, re.MULTILINE):
-            issues.append({'level': 'P2', 'desc': desc, 'match': m.group()[:50], 'line': text[:m.start()].count('\\n') + 1})
+            issues.append({'level': 'P2', 'desc': desc, 'match': m.group()[:50], 'line': text[:m.start()].count('\n') + 1})
 
     p0_count = sum(1 for i in issues if i['level'] == 'P0')
     p1_count = sum(1 for i in issues if i['level'] == 'P1')
@@ -1316,7 +1316,7 @@ def check_project_name_consistency(docx_path, tender_text=None):
 
 def print_check_report(results):
     """打印质检报告"""
-    print('\\\\n' + '=' * 60)
+    print('\n' + '=' * 60)
     print('📋 标书质检报告')
     print('=' * 60)
     s = results['stats']
@@ -1341,9 +1341,9 @@ def print_check_report(results):
     nf = len(results['fail'])
     nw = len(results['warn'])
     if total_issues == 0:
-        print('\\\\n🎉 全部通过！没有发现任何问题。')
+        print('\n🎉 全部通过！没有发现任何问题。')
     else:
-        print(f'\\\\n📈 共 {total_issues} 个问题（{nf} 个错误, {nw} 个警告）')
+        print(f'\n📈 共 {total_issues} 个问题（{nf} 个错误, {nw} 个警告）')
 
 
 # ===== 行业自动检测 =====
@@ -1555,7 +1555,7 @@ def main():
         if not os.path.exists(content_file):
             print(f'❌ 正文文件不存在: {content_file}'); sys.exit(1)
         results = check_scoring_coverage(matrix_file, content_file)
-        print('\\n' + '=' * 60)
+        print('\n' + '=' * 60)
         print('📋 评分项覆盖矩阵检查报告')
         print('=' * 60)
         print(f'📊 评分项总数: {results["total"]}')
@@ -1563,15 +1563,15 @@ def main():
         print(f'❌ 未覆盖: {len(results["uncovered"])}')
         print(f'⚠️  状态异常: {len(results["status_mismatch"])}')
         if results['uncovered']:
-            print('\\n❌ 未覆盖的评分项:')
+            print('\n❌ 未覆盖的评分项:')
             for row in results['uncovered']:
                 print(f'  {row["id"]} | {row["content"]} | 应在: {row["chapter"]}')
         if results['status_mismatch']:
-            print('\\n⚠️  状态未标"已响应"的评分项:')
+            print('\n⚠️  状态未标"已响应"的评分项:')
             for row in results['status_mismatch']:
                 print(f'  {row["id"]} | {row["content"]} | 状态: {row["status"]}')
         status = '✅ PASS' if not results['uncovered'] and not results['status_mismatch'] else '❌ FAIL'
-        print(f'\\n🏁 结论: {status}')
+        print(f'\n🏁 结论: {status}')
         print('=' * 60)
         sys.exit(0)
 
@@ -1579,7 +1579,7 @@ def main():
         if not os.path.exists(args.check_priority):
             print(f'❌ 文件不存在: {args.check_priority}'); sys.exit(1)
         results = check_priority_issues(args.check_priority, dark_mode=args.暗标)
-        print('\\n' + '=' * 60)
+        print('\n' + '=' * 60)
         print('📋 P0/P1/P2 合规分级检查报告')
         print('=' * 60)
         print(f'🔴 P0-致命: {results["p0_count"]} 个')
@@ -1588,7 +1588,7 @@ def main():
             icon = '🔴' if issue['level'] == 'P0' else '🟡'
             print(f'  {icon} 行{issue["line"]} | {issue["desc"]} | 匹配: "{issue["match"]}"')
         deliverable = '✅ 可交付' if results['deliverable'] else '❌ 不可交付（P0>0或P1>2）'
-        print(f'\\n🏁 结论: {deliverable}')
+        print(f'\n🏁 结论: {deliverable}')
         print('=' * 60)
         sys.exit(0)
 
@@ -1657,10 +1657,10 @@ def main():
         if args.json:
             print(json.dumps({'issues': issues, 'count': len(issues)}, ensure_ascii=False))
         elif issues:
-            print(f'\\n⚠️  发现 {len(issues)} 处全角半角问题:\\n')
+            print(f'\n⚠️  发现 {len(issues)} 处全角半角问题:\n')
             for issue in issues:
                 print(f'  行{issue["line"]}: [{issue["type"]}] "{issue["char"]}"')
-                print(f'        上下文: …{issue["context"]}…\\n')
+                print(f'        上下文: …{issue["context"]}…\n')
         else:
             print('✅ 未发现全角半角问题')
         sys.exit(0)
