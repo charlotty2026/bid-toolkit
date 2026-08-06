@@ -21,14 +21,6 @@ dependencies = [
     "pypinyin>=0.49.0",
     "jieba>=0.42.1",
 ]
-
-[project.optional-dependencies]
-desktop = [
-    "gradio>=4.0.0",
-    "pywebview>=4.0.0",
-    "screeninfo>=0.8.0",
-]
-
 keywords = ["bid", "tender", "procurement", "document", "automation"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -36,6 +28,13 @@ classifiers = [
     "Topic :: Office/Business :: Office Suites",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+]
+
+[project.optional-dependencies]
+desktop = [
+    "gradio>=4.0.0",
+    "pywebview>=4.0.0",
+    "screeninfo>=0.8.0",
 ]
 
 [project.urls]
