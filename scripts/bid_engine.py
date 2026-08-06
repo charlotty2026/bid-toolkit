@@ -293,6 +293,7 @@ def parse_md_table(lines, start_idx):
 # ===== Word文档构建 =====
 def add_heading(doc, text, level, heading_spec):
     spec = heading_spec.get(level, heading_spec.get(4, {}))
+    text = strip_md_residue(text)
     p = doc.add_heading(text, level=level)
     for run in p.runs: set_run_font(run, spec['name'], spec['size'], spec['bold'])
     p.paragraph_format.space_before = Pt(spec['space_before'])
@@ -696,6 +697,10 @@ def check_heading_styles(doc):
 
 def strip_md_residue(text):
     """去除Markdown残留语法标记"""
+    # pandoc转换docx产生的anchor/属性标记（可能跨行）：[]{#item_... .anchor}
+    text = re.sub(r'\[\]\{[^}]*\}', '', text, flags=re.DOTALL)
+    # pandoc属性标记：{.mark} {.unnumbered} {.anchor} 等
+    text = re.sub(r'\{[^}]*\}', '', text)
     text = re.sub(r'!\[([^\]]*)\]\(([^)]*)\)', r'[图片: \1]', text)
     text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1（\2）', text)
     text = re.sub(r'~~(.+?)~~', r'\1', text)
@@ -854,6 +859,11 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
     """Markdown → Word转换"""
     if config is None:
         config = DEFAULT_CONFIG
+
+    # 全局清理 pandoc 转换残留（跨行 anchor/属性标记，逐行处理无法覆盖）
+    md_text = re.sub(r'\[\]\{[^}]*\}', '', md_text, flags=re.DOTALL)
+    md_text = re.sub(r'\{\.(?:mark|anchor|unnumbered)[^}]*\}', '', md_text, flags=re.DOTALL)
+    md_text = re.sub(r'^\s*\{\#.*$', '', md_text, flags=re.MULTILINE)
 
     heading_spec, body_spec, table_spec, page_spec = build_specs(config)
 
