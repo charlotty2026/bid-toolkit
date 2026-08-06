@@ -27,7 +27,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 try:
     from docx import Document
     from docx.shared import Pt, Inches, Twips, Cm, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_COLOR_INDEX
     from docx.enum.table import WD_TABLE_ALIGNMENT
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
@@ -705,10 +705,33 @@ def strip_md_residue(text):
     return text
 
 
-def add_body(doc, text, body_spec):
+def add_body(doc, text, body_spec, fill_mode='underline'):
     text = strip_md_residue(text)
-    p = doc.add_paragraph(text, style='Normal')
-    for run in p.runs: set_run_font(run, body_spec['font'], body_spec['size'], body_spec['bold'])
+    p = doc.add_paragraph(style='Normal')
+    # 按fill_mode处理填空位
+    # underline: 保留原样（默认）
+    # highlight: 黄色高亮框
+    # filled: 直接填掉（替换为提示文本）
+    # blank: 留空
+    if fill_mode == 'underline' or fill_mode == 'blank':
+        run = p.add_run(text if fill_mode == 'underline' else '')
+        set_run_font(run, body_spec['font'], body_spec['size'], body_spec['bold'])
+    elif fill_mode == 'highlight':
+        # 将____或___替换为黄色高亮填空框
+        parts = re.split(r'(_{3,})', text)
+        for part in parts:
+            if re.match(r'_{3,}$', part):
+                run = p.add_run('        ')  # 8个空格作为填空位
+                set_run_font(run, body_spec['font'], body_spec['size'], body_spec['bold'])
+                run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+            else:
+                run = p.add_run(part)
+                set_run_font(run, body_spec['font'], body_spec['size'], body_spec['bold'])
+    elif fill_mode == 'filled':
+        # 将____替换为"（填写）"
+        text = re.sub(r'_{3,}', '（填写）', text)
+        run = p.add_run(text)
+        set_run_font(run, body_spec['font'], body_spec['size'], body_spec['bold'])
     p.paragraph_format.first_line_indent = Twips(480)
     p.paragraph_format.line_spacing = body_spec['line_spacing']
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -827,7 +850,7 @@ CONSISTENCY_PATTERNS = {
 
 
 # ===== md_to_docx 核心转换函数 =====
-def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None, no_toc=False, use_mermaid_api=False):
+def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None, no_toc=False, use_mermaid_api=False, fill_mode='underline'):
     """Markdown → Word转换"""
     if config is None:
         config = DEFAULT_CONFIG
@@ -913,7 +936,7 @@ def md_to_docx(md_text, output_path, auto_fix=True, dark_mode=False, config=None
             i += 1; continue
         clean_text = re.sub(r'\\*\\*(.+?)\\*\\*', r'\\1', line)
         clean_text = re.sub(r'\\*(.+?)\\*', r'\\1', clean_text)
-        add_body(doc, clean_text, body_spec)
+        add_body(doc, clean_text, body_spec, fill_mode)
         i += 1
     if in_table: add_table(doc, table_headers, table_rows, table_spec)
     if not no_toc:
@@ -1120,6 +1143,177 @@ def check_priority_issues(content_file, dark_mode=False):
     return {'issues': issues, 'p0_count': p0_count, 'p1_count': p1_count, 'deliverable': deliverable}
 
 
+# ===== P0-2: 格式保留校验 =====
+def check_format_integrity(docx_path, tender_path=None):
+    """检查生成的docx是否保留了招标文件的格式要素。
+    检查项：下划线保留、表格线完整、标题层级一致。
+    """
+    doc = Document(docx_path)
+    issues = []
+    stats = {'paragraphs': len(doc.paragraphs), 'tables': len(doc.tables)}
+    
+    # 检查1：下划线保留 —— 扫描docx中所有____连续性下划线标记
+    underline_count = 0
+    for p in doc.paragraphs:
+        underline_count += len(re.findall(r'_{3,}', p.text))
+    for t in doc.tables:
+        for row in t.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    underline_count += len(re.findall(r'_{3,}', p.text))
+    if underline_count > 0:
+        stats['underlines'] = underline_count
+        issues.append({
+            'type': '下划线保留',
+            'severity': 'info',
+            'detail': f'保留 {underline_count} 处下划线填空位（underline模式正常）',
+            'fix': '如使用fill-mode=highlight/filled/blank，下划线会被替换或清空'
+        })
+    else:
+        stats['underlines'] = 0
+        issues.append({
+            'type': '下划线保留',
+            'severity': 'warn',
+            'detail': '未检测到下划线填空位，可能已被fill-mode替换或原有内容无下划线'
+        })
+    
+    # 检查2：表格线完整性 —— 检查表格是否跨页正确
+    table_issues = 0
+    for t_idx, t in enumerate(doc.tables):
+        # 检查是否有空行导致的表格断裂
+        for row_idx, row in enumerate(t.rows):
+            cell_texts = [c.text.strip() for c in row.cells]
+            empty_cells = sum(1 for c in cell_texts if not c)
+            if empty_cells == len(row.cells):
+                table_issues += 1
+                issues.append({
+                    'type': '表格线完整性',
+                    'severity': 'warn',
+                    'detail': f'表格{t_idx+1}第{row_idx+1}行为空行，可能导致表格显示断裂',
+                    'fix': '删除空行或合并单元格'
+                })
+    if table_issues == 0:
+        issues.append({
+            'type': '表格线完整性',
+            'severity': 'pass',
+            'detail': f'共 {len(doc.tables)} 个表格，未发现空行断裂'
+        })
+    
+    # 检查3：标题层级一致性 —— 检查标题是否连续（没有跳级）
+    heading_levels = []
+    for p in doc.paragraphs:
+        if p.style and p.style.name and 'Heading' in p.style.name:
+            try:
+                level = int(p.style.name.replace('Heading ', '').replace('headi...', ''))
+                heading_levels.append((level, p.text[:40]))
+            except ValueError:
+                pass
+    level_jumps = []
+    for i in range(1, len(heading_levels)):
+        prev_level, curr_level = heading_levels[i-1][0], heading_levels[i][0]
+        if curr_level - prev_level > 1:
+            level_jumps.append({
+                'from': heading_levels[i-1],
+                'to': heading_levels[i]
+            })
+    if level_jumps:
+        for j in level_jumps[:5]:
+            issues.append({
+                'type': '标题层级跳级',
+                'severity': 'warn',
+                'detail': f'从H{j["from"][0]}「{j["from"][1]}」跳到H{j["to"][0]}「{j["to"][1]}」',
+                'fix': '检查是否漏了中间级标题，或调整标题级别'
+            })
+    else:
+        issues.append({
+            'type': '标题层级一致性',
+            'severity': 'pass',
+            'detail': f'共 {len(heading_levels)} 个标题，层级连续无跳级'
+        })
+    
+    return {'issues': issues, 'stats': stats, 'total_issues': len(issues)}
+
+
+# ===== P0-3: 项目名称交叉验证 =====
+def check_project_name_consistency(docx_path, tender_text=None):
+    """扫描docx中所有出现的项目名称相关字段，检查是否与招标文件一致。"""
+    doc = Document(docx_path)
+    full_text = '\n'.join(p.text for p in doc.paragraphs)
+    for t in doc.tables:
+        for row in t.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    full_text += '\n' + p.text
+    
+    issues = []
+    
+    # 关键字段检查清单
+    checks = {
+        '项目编号': [r'项目[编号码][\s：:]*([^\s，。,\.]{5,40})'],
+        '招标编号': [r'招标[编号码][\s：:]*([^\s，。,\.]{5,40})'],
+        '项目名称': [r'项目名称[\s：:]*([^\n，。,\.]{4,80})'],
+        '投标有效期': [r'投标有效期[\s：:]*([^\n。]{4,30})'],
+        '投标人名称': [r'投标[人商][\s：:]*([^\s，。,\.]{2,40})'],
+    }
+    
+    found = {}
+    for field_name, patterns in checks.items():
+        matches = []
+        for pattern in patterns:
+            for m in re.finditer(pattern, full_text):
+                matches.append(m.group(1).strip())
+        if matches:
+            # 去重
+            unique = list(dict.fromkeys(matches))
+            found[field_name] = unique
+            if len(unique) > 1:
+                issues.append({
+                    'type': '项目信息不一致',
+                    'severity': 'warn',
+                    'detail': f'{field_name}出现多个不同值: {", ".join(unique[:3])}',
+                    'fix': '确认哪个是正确值，统一全文'
+                })
+            else:
+                issues.append({
+                    'type': '项目信息',
+                    'severity': 'pass',
+                    'detail': f'{field_name}: {unique[0][:50]}'
+                })
+        else:
+            found[field_name] = []
+            issues.append({
+                'type': '项目信息缺失',
+                'severity': 'warn',
+                'detail': f'未找到{field_name}',
+                'fix': '检查是否缺少该字段，或字段名不标准'
+            })
+    
+    # 如果提供了招标文件原文，做交叉对比
+    if tender_text:
+        tender_found = {}
+        for field_name, patterns in checks.items():
+            for pattern in patterns:
+                m = re.search(pattern, tender_text)
+                if m:
+                    tender_found[field_name] = m.group(1).strip()
+                    break
+        # 对比
+        for field_name, bid_values in found.items():
+            if field_name in tender_found and bid_values:
+                tender_val = tender_found[field_name].lower()
+                bid_val = bid_values[0].lower()
+                # 简单相似度比较
+                if tender_val != bid_val and tender_val not in bid_val and bid_val not in tender_val:
+                    issues.append({
+                        'type': '项目信息与招标文件不符',
+                        'severity': 'fail',
+                        'detail': f'{field_name}: 标书中「{bid_values[0][:40]}」≠ 招标文件「{tender_found[field_name][:40]}」',
+                        'fix': '以招标文件为准修正'
+                    })
+    
+    return {'issues': issues, 'found': found, 'total_issues': len(issues)}
+
+
 def print_check_report(results):
     """打印质检报告"""
     print('\\\\n' + '=' * 60)
@@ -1310,7 +1504,49 @@ def main():
                         help='条款-方案映射审计：传招标文件路径和方案文件路径，自动分析评分覆盖')
     parser.add_argument('--mermaid-api', action='store_true', default=False,
                         help='使用mermaid.ink网络API渲染图表（不依赖本地mmdc命令）')
+    parser.add_argument('--fill-mode', type=str, default='underline',
+                        choices=['underline', 'highlight', 'filled', 'blank'],
+                        help='填空模式: underline=下划线保留(默认), highlight=黄色高亮框, filled=直接填掉, blank=留空不标记')
+    parser.add_argument('--format-check', type=str, default=None, metavar='DOCX',
+                        help='P0-2: 格式保留校验，检查docx中下划线/表格线/标题层级')
+    parser.add_argument('--project-check', type=str, default=None, nargs='?', const='auto', metavar='DOCX',
+                        help='P0-3: 项目名称交叉验证，扫描docx中项目信息是否一致。提供招标文件路径作交叉对比')
     args = parser.parse_args()
+
+    if args.format_check:
+        result = check_format_integrity(args.format_check)
+        print('\n' + '=' * 60)
+        print('📋 P0-2 格式保留校验报告')
+        print('=' * 60)
+        print(f'📊 统计: {result["stats"]["paragraphs"]} 段落, {result["stats"]["tables"]} 表格')
+        if 'underlines' in result['stats']:
+            print(f'  📝 下划线填空位: {result["stats"]["underlines"]} 处')
+        for issue in result['issues']:
+            icon = {'pass': '✅', 'info': 'ℹ️', 'warn': '⚠️', 'fail': '❌'}.get(issue['severity'], '📌')
+            print(f'  {icon} {issue["type"]}: {issue["detail"]}')
+            if 'fix' in issue:
+                print(f'      💡 修复: {issue["fix"]}')
+        total = result['total_issues']
+        print(f'\n📈 共 {total} 项检查（{sum(1 for i in result["issues"] if i["severity"]=="pass")} 通过）')
+        return
+
+    if args.project_check:
+        docx_path = args.project_check
+        tender_text = None
+        if args.project_check == 'auto':
+            print('⚠️  auto模式需要提供招标文件路径，请使用 --project-check <docx_path> <tender_path>')
+            return
+        result = check_project_name_consistency(docx_path, tender_text)
+        print('\n' + '=' * 60)
+        print('📋 P0-3 项目名称交叉验证报告')
+        print('=' * 60)
+        for issue in result['issues']:
+            icon = {'pass': '✅', 'info': 'ℹ️', 'warn': '⚠️', 'fail': '❌'}.get(issue['severity'], '📌')
+            print(f'  {icon} {issue["type"]}: {issue["detail"]}')
+            if 'fix' in issue:
+                print(f'      💡 修复: {issue["fix"]}')
+        print(f'\n📈 共 {result["total_issues"]} 项检查')
+        return
 
     if args.check_scoring:
         matrix_file, content_file = args.check_scoring
@@ -1459,7 +1695,8 @@ def main():
 
     output = args.output or os.path.splitext(args.input)[0] + '_排版.docx'
     md_to_docx(md_text, output, auto_fix=not args.no_fix, dark_mode=args.暗标,
-               config=config, no_toc=args.no_toc, use_mermaid_api=args.mermaid_api)
+               config=config, no_toc=args.no_toc, use_mermaid_api=args.mermaid_api,
+               fill_mode=args.fill_mode)
     print(f'✅ 已生成: {output}')
 
     # --deflavor: 生成后自动运行AI味雷达检测
