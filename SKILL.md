@@ -196,8 +196,8 @@ openvino（AI PC：iGPU/NPU 卸载，CPU 兜底）→ local（sentence-transform
 **推理全程纯本地**，并把 CLS pooling + L2 归一化固化进计算图（IR 输出即句向量，
 推理侧无需再 pooling）。在 Intel AI PC 上把算子卸载到核显。
 
-**参考性能（AI PC iGPU 预期值；i7-13700H + Intel Iris Xe iGPU，40 条文本/批，由
-`python tools/build_ov_model.py --benchmark` 现场跑出）**：
+**参考性能（AI PC iGPU 预期值；参考环境 i7-13700H + Intel Iris Xe iGPU，40 条文本/批，可由
+`python tools/build_ov_model.py --benchmark` 复现）**：
 
 | 后端 | 耗时 | 相对 PyTorch |
 |---|---|---|
@@ -227,7 +227,7 @@ python -m bid_toolkit rag query "投标保证金" --project demo --top-k 5
 ```
 
 默认设备 `AUTO:GPU,CPU`（自动挑最快可用设备并兜底 CPU）。若想**确保吃到核显**，
-可显式指定：`set BID_RAG_OV_DEVICE=GPU`（实测日志会打印 `设备=GPU.0`）。
+可显式指定：`set BID_RAG_OV_DEVICE=GPU`（日志会打印 `设备=GPU.0`）。
 NPU 机型设 `BID_RAG_OV_DEVICE=NPU`。
 
 混合检索：本地向量库（localvec，仅 numpy）同时维护 BM25 倒排索引，检索时把
