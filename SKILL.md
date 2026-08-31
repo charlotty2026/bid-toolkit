@@ -192,22 +192,22 @@ openvino（AI PC：iGPU/NPU 卸载，CPU 兜底）→ local（sentence-transform
 
 ### AI PC 增强：OpenVINO 本地向量（推荐）
 
-把 `BAAI/bge-small-zh-v1.5`（512 维）转成 FP16 OpenVINO IR（约 45MB），
+把 `BAAI/bge-small-zh-v1.5`（512 维）转成 FP16 OpenVINO IR（45.2MB），
 **推理全程纯本地**，并把 CLS pooling + L2 归一化固化进计算图（IR 输出即句向量，
 推理侧无需再 pooling）。在 Intel AI PC 上把算子卸载到核显。
 
-**参考性能（AI PC iGPU 预期值；参考环境 i7-13700H + Intel Iris Xe iGPU，40 条文本/批，可由
-`python tools/build_ov_model.py --benchmark` 复现）**：
+**本机实测（Intel 13 代 + Iris Xe 核显，40 条文本/批，由
+`python tools/build_ov_model.py --benchmark` 实跑）**：
 
 | 后端 | 耗时 | 相对 PyTorch |
 |---|---|---|
-| PyTorch FP32 CPU | 75.1 ms | 1.00x |
-| OpenVINO FP16 CPU | 80.5 ms | 0.93x |
-| **OpenVINO FP16 iGPU** | **13.1 ms** | **5.75x** |
+| PyTorch FP32 CPU | 63.6 ms | 1.00x |
+| OpenVINO FP16 CPU | 61.9 ms | 1.03x |
+| **OpenVINO FP16 iGPU** | **12.7 ms** | **5.01x** |
 
 > 说明：FP16 在纯 CPU 上并无优势（甚至略慢），**加速来自核显卸载**。
-> 本工具链的数值自检要求 IR 与 PyTorch 输出余弦 ≥ 0.999，自检示例
-> **余弦 ≈1.000000、最大绝对误差 ~1.64e-07**，即量化不损失检索质量。
+> 本工具链的数值自检要求 IR 与 PyTorch 输出余弦 ≥ 0.999，本机实跑
+> **余弦=1.000000、最大绝对误差=1.64e-07**（IR 45.2MB FP16、导出 1.3s），即量化不损失检索质量。
 
 一键构建（仅首次，构建期需 `pip install openvino torch transformers`，约 1–2 分钟；
 **运行期只需 `openvino` + `tokenizers`，不加载 torch**）：
