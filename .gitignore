@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+desensitization_report.json
+.bidproject/
+*.bak
