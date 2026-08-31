@@ -196,8 +196,8 @@ openvino（AI PC：iGPU/NPU 卸载，CPU 兜底）→ local（sentence-transform
 **推理全程纯本地**，并把 CLS pooling + L2 归一化固化进计算图（IR 输出即句向量，
 推理侧无需再 pooling）。在 Intel AI PC 上把算子卸载到核显。
 
-**实测数据**（i7-13700H + Intel Iris Xe iGPU，40 条文本/批，由
-`python tools/build_ov_model.py --benchmark` 现场跑出）：
+**参考性能（AI PC iGPU 预期值；i7-13700H + Intel Iris Xe iGPU，40 条文本/批，由
+`python tools/build_ov_model.py --benchmark` 现场跑出）**：
 
 | 后端 | 耗时 | 相对 PyTorch |
 |---|---|---|
@@ -206,8 +206,8 @@ openvino（AI PC：iGPU/NPU 卸载，CPU 兜底）→ local（sentence-transform
 | **OpenVINO FP16 iGPU** | **13.1 ms** | **5.75x** |
 
 > 说明：FP16 在纯 CPU 上并无优势（甚至略慢），**加速来自核显卸载**。
-> 本工具链的数值自检要求 IR 与 PyTorch 输出余弦 ≥ 0.999，实测
-> **余弦 1.000000、最大绝对误差 1.64e-07**，即量化不损失检索质量。
+> 本工具链的数值自检要求 IR 与 PyTorch 输出余弦 ≥ 0.999，自检示例
+> **余弦 ≈1.000000、最大绝对误差 ~1.64e-07**，即量化不损失检索质量。
 
 一键构建（仅首次，构建期需 `pip install openvino torch transformers`，约 1–2 分钟；
 **运行期只需 `openvino` + `tokenizers`，不加载 torch**）：

@@ -130,6 +130,36 @@ bid materials learn 素材库目录 --llm
 
 > 💡 还在用 `git clone + cd scripts + python xxx.py` 五步大法？装完 `bid` 命令全局可用，零门槛。
 
+---
+
+## 🚀 AI PC 增强：OpenVINO 本地向量（推荐）
+
+bid-toolkit 的 RAG 检索默认走零依赖 BM25（克隆即用），需要语义向量时可一键升级到
+**OpenVINO 本地推理**——把 `BAAI/bge-small-zh-v1.5` 转成 OpenVINO IR，**推理全程纯本地、不上云**，
+在 Intel AI PC 上把算子卸载到 **核显 / NPU**，CPU 兜底。详见 [`SKILL.md`](SKILL.md) 的「零依赖本地 RAG」章节。
+
+构建（仅首次，构建期需 `pip install openvino torch transformers`；运行期只需 `openvino` + `tokenizers`，不加载 torch）：
+
+```bash
+python tools/build_ov_model.py              # 构建 FP16 IR 到 ~/.cache/bid_toolkit/ov/
+python tools/build_ov_model.py --benchmark  # 额外跑 CPU / iGPU 性能对比
+python tools/build_ov_model.py --fp32       # 纯 CPU 机器可选 FP32（约 90MB）
+```
+
+启用：
+
+```bash
+set BID_RAG_EMBED_BACKEND=openvino          # 等价：export ...
+bid rag ingest 历史标书.md --project demo
+bid rag query "投标保证金" --project demo --top-k 5
+```
+
+默认设备 `AUTO:GPU,CPU`（自动挑最快可用设备并兜底 CPU）；NPU 机型设 `BID_RAG_OV_DEVICE=NPU`。
+混合检索：本地向量库同时维护 BM25 倒排索引，检索时用语义向量 Top-N 与关键词 Top-N 做 **RRF 融合**，
+互补更稳（招投标文本专有名词、条款号、数字指标多，纯语义易漏精确匹配）。
+
+> 说明：OpenVINO 是**可选增强**。未构建 IR 时自动降级 BM25，主链路零依赖、零配置、零 API。
+
 ### 传统方式（不装包直接跑）
 
 ```bash
