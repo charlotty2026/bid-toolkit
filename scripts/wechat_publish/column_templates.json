@@ -1,0 +1,349 @@
+{
+  "version": "1.0.0",
+  "description": "公众号栏目排版模板配置 - 每个栏目绑定固定排版风格，内容区域留空",
+  "templates": {
+    "江湖夜话": {
+      "name": "江湖夜话",
+      "category": "ai_news",
+      "style": "border_card",
+      "description": "AI资讯类文章，边框卡片化排版，科技蓝主色调",
+      "color_scheme": {
+        "primary": "#4A90E2",
+        "background": "#F7F8FA",
+        "card_bg": "#FFFFFF",
+        "text": "#333333",
+        "accent": "#E8534F",
+        "border": "#E0E0E0"
+      },
+      "typography": {
+        "h1_size": "20px",
+        "h2_size": "17px",
+        "body_size": "15px",
+        "line_height": "1.8",
+        "paragraph_spacing": "10px"
+      },
+      "layout_rules": {
+        "card_border": true,
+        "card_radius": "8px",
+        "card_padding": "16px",
+        "card_margin": "12px 0",
+        "card_shadow": "0 2px 8px rgba(0,0,0,0.06)",
+        "section_divider": true,
+        "section_divider_style": "dashed"
+      },
+      "required_elements": [
+        "card_container",
+        "section_border",
+        "h2_left_bar"
+      ],
+      "min_image_count": 1,
+      "long_article_threshold": 1500,
+      "long_article_min_images": 2
+    },
+    "百鬼夜行": {
+      "name": "百鬼夜行",
+      "category": "ai_news",
+      "style": "border_card",
+      "description": "AI行业动态/竞品分析，边框卡片化排版，暗黑科技风",
+      "color_scheme": {
+        "primary": "#2D2D2D",
+        "background": "#1A1A1A",
+        "card_bg": "#2D2D2D",
+        "text": "#E8E8E8",
+        "accent": "#00D4AA",
+        "border": "#404040"
+      },
+      "typography": {
+        "h1_size": "20px",
+        "h2_size": "17px",
+        "body_size": "15px",
+        "line_height": "1.8",
+        "paragraph_spacing": "10px"
+      },
+      "layout_rules": {
+        "card_border": true,
+        "card_radius": "6px",
+        "card_padding": "16px",
+        "card_margin": "12px 0",
+        "card_shadow": "0 2px 12px rgba(0,0,0,0.3)",
+        "section_divider": true,
+        "section_divider_style": "solid"
+      },
+      "required_elements": [
+        "card_container",
+        "section_border",
+        "dark_mode_compatible"
+      ],
+      "min_image_count": 1,
+      "long_article_threshold": 1500,
+      "long_article_min_images": 2
+    },
+    "宗门实录": {
+      "name": "宗门实录",
+      "category": "insider",
+      "style": "border_card",
+      "description": "内部项目/运营记录，边框卡片化排版，专业稳重风",
+      "color_scheme": {
+        "primary": "#5B8FF9",
+        "background": "#F7F8FA",
+        "card_bg": "#FFFFFF",
+        "text": "#333333",
+        "accent": "#FF6B6B",
+        "border": "#E0E0E0"
+      },
+      "typography": {
+        "h1_size": "20px",
+        "h2_size": "17px",
+        "body_size": "15px",
+        "line_height": "1.8",
+        "paragraph_spacing": "10px"
+      },
+      "layout_rules": {
+        "card_border": true,
+        "card_radius": "8px",
+        "card_padding": "16px",
+        "card_margin": "12px 0",
+        "card_shadow": "0 2px 8px rgba(0,0,0,0.06)",
+        "section_divider": true,
+        "section_divider_style": "dashed"
+      },
+      "required_elements": [
+        "card_container",
+        "section_border",
+        "h2_left_bar"
+      ],
+      "min_image_count": 1,
+      "long_article_threshold": 1500,
+      "long_article_min_images": 2
+    },
+    "专项攻略": {
+      "name": "专项攻略",
+      "category": "tutorial",
+      "style": "minimalist",
+      "description": "技术攻略/操作指南，纯黑白极简风，专注内容可读性",
+      "color_scheme": {
+        "primary": "#000000",
+        "background": "#FFFFFF",
+        "card_bg": "#FFFFFF",
+        "text": "#333333",
+        "accent": "#E8534F",
+        "border": "#CCCCCC"
+      },
+      "typography": {
+        "h1_size": "22px",
+        "h2_size": "18px",
+        "body_size": "16px",
+        "line_height": "1.8",
+        "paragraph_spacing": "12px"
+      },
+      "layout_rules": {
+        "card_border": false,
+        "card_radius": "0px",
+        "card_padding": "0px",
+        "card_margin": "0px",
+        "card_shadow": "none",
+        "section_divider": false,
+        "section_divider_style": "none"
+      },
+      "required_elements": [
+        "clean_layout",
+        "code_block_styled",
+        "table_styled"
+      ],
+      "min_image_count": 0,
+      "long_article_threshold": 1500,
+      "long_article_min_images": 2
+    },
+    "灵兽谭": {
+      "name": "灵兽谭",
+      "category": "product_review",
+      "style": "border_card",
+      "description": "产品测评/工具推荐，边框卡片化排版，活泼配色",
+      "color_scheme": {
+        "primary": "#FF6B6B",
+        "background": "#FFF8F0",
+        "card_bg": "#FFFFFF",
+        "text": "#333333",
+        "accent": "#FFA500",
+        "border": "#FFE4C4"
+      },
+      "typography": {
+        "h1_size": "20px",
+        "h2_size": "17px",
+        "body_size": "15px",
+        "line_height": "1.8",
+        "paragraph_spacing": "10px"
+      },
+      "layout_rules": {
+        "card_border": true,
+        "card_radius": "12px",
+        "card_padding": "16px",
+        "card_margin": "12px 0",
+        "card_shadow": "0 2px 8px rgba(0,0,0,0.06)",
+        "section_divider": true,
+        "section_divider_style": "dashed"
+      },
+      "required_elements": [
+        "card_container",
+        "section_border",
+        "h2_left_bar",
+        "product_highlight_box"
+      ],
+      "min_image_count": 2,
+      "long_article_threshold": 1500,
+      "long_article_min_images": 3
+    },
+    "双面镜": {
+      "name": "双面镜",
+      "category": "commentary",
+      "style": "border_card",
+      "description": "观点评论/深度分析，边框卡片化排版，思辨风格",
+      "color_scheme": {
+        "primary": "#6B5B95",
+        "background": "#F5F3F8",
+        "card_bg": "#FFFFFF",
+        "text": "#333333",
+        "accent": "#FF7F50",
+        "border": "#E0E0E0"
+      },
+      "typography": {
+        "h1_size": "20px",
+        "h2_size": "17px",
+        "body_size": "15px",
+        "line_height": "1.8",
+        "paragraph_spacing": "10px"
+      },
+      "layout_rules": {
+        "card_border": true,
+        "card_radius": "8px",
+        "card_padding": "16px",
+        "card_margin": "12px 0",
+        "card_shadow": "0 2px 8px rgba(0,0,0,0.06)",
+        "section_divider": true,
+        "section_divider_style": "dashed"
+      },
+      "required_elements": [
+        "card_container",
+        "section_border",
+        "h2_left_bar",
+        "quote_block_styled"
+      ],
+      "min_image_count": 1,
+      "long_article_threshold": 1500,
+      "long_article_min_images": 2
+    },
+    "他山石": {
+      "name": "他山石",
+      "category": "reference",
+      "style": "border_card",
+      "description": "行业参考/案例借鉴，边框卡片化排版，专业参考风",
+      "color_scheme": {
+        "primary": "#4A90E2",
+        "background": "#F7F8FA",
+        "card_bg": "#FFFFFF",
+        "text": "#333333",
+        "accent": "#5B8FF9",
+        "border": "#E0E0E0"
+      },
+      "typography": {
+        "h1_size": "20px",
+        "h2_size": "17px",
+        "body_size": "15px",
+        "line_height": "1.8",
+        "paragraph_spacing": "10px"
+      },
+      "layout_rules": {
+        "card_border": true,
+        "card_radius": "8px",
+        "card_padding": "16px",
+        "card_margin": "12px 0",
+        "card_shadow": "0 2px 8px rgba(0,0,0,0.06)",
+        "section_divider": true,
+        "section_divider_style": "dashed"
+      },
+      "required_elements": [
+        "card_container",
+        "section_border",
+        "h2_left_bar",
+        "case_study_box"
+      ],
+      "min_image_count": 1,
+      "long_article_threshold": 1500,
+      "long_article_min_images": 2
+    },
+    "硅基情话": {
+      "name": "硅基情话",
+      "category": "story",
+      "style": "border_card",
+      "description": "AI人文/情感故事，边框卡片化排版，温暖人文风",
+      "color_scheme": {
+        "primary": "#FF6B9D",
+        "background": "#FFF0F5",
+        "card_bg": "#FFFFFF",
+        "text": "#333333",
+        "accent": "#FF69B4",
+        "border": "#FFC0CB"
+      },
+      "typography": {
+        "h1_size": "20px",
+        "h2_size": "17px",
+        "body_size": "15px",
+        "line_height": "1.8",
+        "paragraph_spacing": "10px"
+      },
+      "layout_rules": {
+        "card_border": true,
+        "card_radius": "12px",
+        "card_padding": "16px",
+        "card_margin": "12px 0",
+        "card_shadow": "0 2px 8px rgba(0,0,0,0.06)",
+        "section_divider": true,
+        "section_divider_style": "dashed"
+      },
+      "required_elements": [
+        "card_container",
+        "section_border",
+        "h2_left_bar",
+        "story_quote_styled"
+      ],
+      "min_image_count": 1,
+      "long_article_threshold": 1500,
+      "long_article_min_images": 2
+    }
+  },
+  "global_rules": {
+    "character_hygiene": true,
+    "fullwidth_halfwidth_normalization": true,
+    "zero_width_char_removal": true,
+    "smart_quote_conversion": true,
+    "min_title_length": 5,
+    "max_title_length": 64,
+    "cover_image_required": true,
+    "cover_image_max_size_kb": 64,
+    "cover_image_dimensions": "2560x1440",
+    "article_min_length": 300,
+    "article_max_length": 50000
+  },
+  "content_quality_checks": {
+    "typo_check": {
+      "enabled": true,
+      "level": "basic",
+      "description": "基础错别字检查（常见同音字、形近字）"
+    },
+    "readability_check": {
+      "enabled": true,
+      "level": "basic",
+      "description": "基础语句通顺检查（过长句子、重复用词）"
+    },
+    "logic_check": {
+      "enabled": true,
+      "level": "basic",
+      "description": "基础逻辑检查（矛盾陈述、数据一致性）"
+    },
+    "reference_check": {
+      "enabled": true,
+      "level": "flag_suspicious",
+      "description": "引用内容标注可疑项（无法验证的数据、事件）"
+    }
+  }
+}

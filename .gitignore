@@ -1,8 +1,19 @@
-__pycache__/
+.gitignore
 *.pyc
+__pycache__/
 *.egg-info/
 build/
 dist/
-desensitization_report.json
-.bidproject/
+.bak
 *.bak
+*.backup.*
+desensitization_report.json
+format_config.yaml
+!/templates/format_config.yaml
+.bidproject/
+
+# 企业资料目录：仓库内只保留 *** 占位模板，供 clone 后直接可用。
+# 填入真实数据后请加 .local 后缀，避免误提交真实证照/业绩/人员信息。
+company_profile/*.local.*
+company_profile/*.local/
+company_profile/local/

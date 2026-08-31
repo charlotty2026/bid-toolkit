@@ -1,0 +1,13 @@
+{
+  "_comment": "示例敏感词库。复制到 ~/.config/bid-toolkit/sensitive_words.json 并填入你自己的内部词，真实词库不进git。",
+  "sensitive": [
+    "your_company_internal_name",
+    "your_internal_code_name"
+  ],
+  "extra_privacy": [
+    "internal_nickname"
+  ],
+  "record": [
+    "your_github_handle"
+  ]
+}

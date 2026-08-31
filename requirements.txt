@@ -9,8 +9,3 @@ pdfplumber>=0.7.0
 # 可选依赖（未安装时自动降级，不影响核心功能）
 pypinyin>=0.49.0  # 错别字检测的同音字层
 jieba>=0.42.1     # 标书查重的分词
-
-# 语义检索可选后端（按需安装其一；缺失则自动降级零依赖 BM25）
-# openvino>=2025.0   # AI PC 加速（iGPU/NPU 卸载），构建 IR：python tools/build_ov_model.py
-# sentence-transformers>=2.0   # 本地 PyTorch embedding
-# 云端 /embeddings 后端无需装库，仅需配置 BID_RAG_CLOUD_EMBED_API_KEY
