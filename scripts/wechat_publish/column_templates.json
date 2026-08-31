@@ -78,44 +78,6 @@
       "long_article_threshold": 1500,
       "long_article_min_images": 2
     },
-    "宗门实录": {
-      "name": "宗门实录",
-      "category": "insider",
-      "style": "border_card",
-      "description": "内部项目/运营记录，边框卡片化排版，专业稳重风",
-      "color_scheme": {
-        "primary": "#5B8FF9",
-        "background": "#F7F8FA",
-        "card_bg": "#FFFFFF",
-        "text": "#333333",
-        "accent": "#FF6B6B",
-        "border": "#E0E0E0"
-      },
-      "typography": {
-        "h1_size": "20px",
-        "h2_size": "17px",
-        "body_size": "15px",
-        "line_height": "1.8",
-        "paragraph_spacing": "10px"
-      },
-      "layout_rules": {
-        "card_border": true,
-        "card_radius": "8px",
-        "card_padding": "16px",
-        "card_margin": "12px 0",
-        "card_shadow": "0 2px 8px rgba(0,0,0,0.06)",
-        "section_divider": true,
-        "section_divider_style": "dashed"
-      },
-      "required_elements": [
-        "card_container",
-        "section_border",
-        "h2_left_bar"
-      ],
-      "min_image_count": 1,
-      "long_article_threshold": 1500,
-      "long_article_min_images": 2
-    },
     "专项攻略": {
       "name": "专项攻略",
       "category": "tutorial",
@@ -305,6 +267,44 @@
         "section_border",
         "h2_left_bar",
         "story_quote_styled"
+      ],
+      "min_image_count": 1,
+      "long_article_threshold": 1500,
+      "long_article_min_images": 2
+    },
+    "项目实录": {
+      "name": "项目实录",
+      "category": "insider",
+      "style": "border_card",
+      "description": "内部项目/运营记录，边框卡片化排版，专业稳重风",
+      "color_scheme": {
+        "primary": "#5B8FF9",
+        "background": "#F7F8FA",
+        "card_bg": "#FFFFFF",
+        "text": "#333333",
+        "accent": "#FF6B6B",
+        "border": "#E0E0E0"
+      },
+      "typography": {
+        "h1_size": "20px",
+        "h2_size": "17px",
+        "body_size": "15px",
+        "line_height": "1.8",
+        "paragraph_spacing": "10px"
+      },
+      "layout_rules": {
+        "card_border": true,
+        "card_radius": "8px",
+        "card_padding": "16px",
+        "card_margin": "12px 0",
+        "card_shadow": "0 2px 8px rgba(0,0,0,0.06)",
+        "section_divider": true,
+        "section_divider_style": "dashed"
+      },
+      "required_elements": [
+        "card_container",
+        "section_border",
+        "h2_left_bar"
       ],
       "min_image_count": 1,
       "long_article_threshold": 1500,
