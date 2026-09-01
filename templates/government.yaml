@@ -1,0 +1,44 @@
+# 政府采购标准模板
+# 适用：政府采购、事业单位招标、国企一般项目
+# 特点：宋体为主，1.5倍行距，格式中规中矩
+
+body:
+  font: "宋体"
+  size: 12
+  bold: false
+  first_indent_chars: 2
+  line_spacing: 1.5
+  alignment: "justify"
+
+headings:
+  h1:
+    font: "宋体"
+    size: 16
+    bold: true
+    space_before: 12
+    space_after: 6
+  h2:
+    font: "宋体"
+    size: 15
+    bold: true
+    space_before: 8
+    space_after: 4
+  h3:
+    font: "宋体"
+    size: 14
+    bold: true
+    space_before: 6
+    space_after: 3
+
+table:
+  font: "宋体"
+  size: 10.5
+  bold_header: true
+  style: "Table Grid"
+
+page:
+  margin_top: 2.54
+  margin_bottom: 2.54
+  margin_left: 2.00
+  margin_right: 2.00
+  orientation: "portrait"
