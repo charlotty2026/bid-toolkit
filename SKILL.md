@@ -17,7 +17,7 @@ metadata:
   version: 4.1.0
   display_name: 擎标 · 标书自动化工具链（投标侧）
   tags: [tender, 标书, 招投标, 排版, 质检, 脱敏, 审标, RAG, AI PC, 擎标]
-  license: MIT
+  license: CC BY-NC 4.0
 ---
 
 # 擎标 · bid-toolkit 标书自动化工具链（投标侧 v4.1）
