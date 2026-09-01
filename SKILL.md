@@ -157,6 +157,29 @@ python -m bid_toolkit check 标书.docx --coverage                     # 格式 
 
 ---
 
+## 交付前验收清单（门卫三连，一条不过不许交付）
+
+- [ ] **废标级铁律检查**：`python -m bid_toolkit orchestrate check 内容.json --docx 标书.docx` — 有废标级问题 = 禁止提交
+- [ ] **去 AI 味 + 脱敏**：`python -m bid_toolkit desense 标书.docx --mode bid`
+- [ ] **格式 + 评分项覆盖**：`python -m bid_toolkit check 标书.docx --coverage`
+- [ ] 标题全用真实 Heading 样式（编号由引擎生成，无手打编号文本）
+- [ ] 能表格化的内容已表格化（机制/时限/责任人/考核）
+- [ ] 中文全角括号与标点（`（一）` 而非 `(一)`），首行缩进由引擎处理、未手敲空格
+
+---
+
+## 常见坑（Common Pitfalls）
+
+1. **把排版当评测**：风险扫描是 `review`，Markdown→Word 是 `engine`/`render`。用错 = 跑出来的东西不是你要的。
+2. **手打标题编号**：标题直接用真 Heading 样式，编号交给 Word numbering.xml 自动生成。手打"第一章/一、"会让客户换不了编号皮肤。
+3. **正文加粗冒充标题**：标题必须用 Heading 样式，加粗正文不是标题，引擎会漏编号和目录。
+4. **首行缩进手敲空格**：缩进由引擎处理，手敲空格反而破坏排版。
+5. **写死内容代替工具**：本工具链不生成内容，只约束排版/质检/审标。别指望脚本替你写方案，`content.json` 由你（Agent 大脑）写。
+6. **半角括号/标点混入**：中文正文用全角 `（）`，混入半角 `()` 在最终 Word 里很不专业。
+7. **跳过 `orchestrate lock`**：框架不锁定就跑后面的，越改越偏，最后 diff 对不上。
+
+---
+
 ## 排版可配置（不改代码）
 
 复制模板后改 YAML 即可：页面 / 字体 / 各级标题字号与对齐 / 编号格式 / 表格 / 封面 / 页码。
