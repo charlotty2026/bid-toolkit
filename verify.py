@@ -34,8 +34,6 @@ SAMPLE_TENDER = os.path.join("tests", "test_tender.md")
 SAMPLE_CONTENT = os.path.join("tests", "sample_content.json")
 SAMPLE_BID = os.path.join("examples", "demo_bid.md")
 SAMPLE_RAG = os.path.join("examples", "招标文件.md")
-# desense 会把 JSON 报告写到包目录，测试结束后清理，避免污染源码树
-_STRAY_REPORT = os.path.join(ROOT, "bid_toolkit", "desensitization_report.json")
 
 _results: list[tuple[str, bool, str]] = []
 
@@ -146,11 +144,6 @@ def main() -> int:
             )
     finally:
         shutil.rmtree(work, ignore_errors=True)
-        if os.path.exists(_STRAY_REPORT):
-            try:
-                os.remove(_STRAY_REPORT)
-            except OSError:
-                pass
 
     print()
     passed = sum(1 for _, ok, _ in _results if ok)
