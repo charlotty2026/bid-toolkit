@@ -57,7 +57,7 @@ Agent 使用者请直接读对应的 `SKILL.md`；本文件是人类阅读的项
 
 ## 开源版能力边界（重要）
 
-本仓库是 **开源版（MIT）**，定位为「纯 Python 命令行工具链」——你用 `bid` 命令跑全套脚本，或 Agent 直接调脚本即可，**无需安装大型应用、无需配置 LLM**（见顶部说明）。
+本仓库是 **开源版（CC BY-NC 4.0）**，定位为「纯 Python 命令行工具链」——你用 `bid` 命令跑全套脚本，或 Agent 直接调脚本即可，**无需安装大型应用、无需配置 LLM**（见顶部说明）。
 
 ✅ **开源版包含**（均为 CLI 子命令）：
 
@@ -450,7 +450,7 @@ python scripts/bid_consistency_check.py check 标书.docx --json
 | **RFP招标文件生成器** | ✅ | ❌ |
 | **多格式模板系统** | ✅ 3套 | ❌ |
 | **技术栈** | Python纯后端 | Electron+React+TS |
-| **License** | MIT | AGPL-3.0 |
+| **License** | CC BY-NC 4.0 | AGPL-3.0 |
 
 **各自路线**：bid-toolkit走"纯Python命令行+格式铁律"路线，强在格式修复和暗标；易标走"桌面GUI+AI生成"路线，强在内容生成和可视化。两者互补，用户可按需选择甚至组合使用。
 
