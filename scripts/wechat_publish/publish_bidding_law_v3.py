@@ -24,7 +24,14 @@ from pathlib import Path
 # ============================================================
 # Configuration Loading
 # ============================================================
-def _load_env(path="/opt/zongmen/.env"):
+def _load_env(path=None):
+    # 优先级：显式传入 > 环境变量 BID_TOOLKIT_ENV > ~/.bidtoolkit.env > 宗门内默认路径
+    if path is None:
+        path = (
+            os.environ.get("BID_TOOLKIT_ENV")
+            or os.path.expanduser("~/.bidtoolkit.env")
+            or "/opt/zongmen/.env"
+        )
     creds = {}
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:

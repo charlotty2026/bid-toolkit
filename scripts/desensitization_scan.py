@@ -9,6 +9,7 @@
 import subprocess
 import os
 import json
+import tempfile
 from datetime import datetime
 from collections import defaultdict
 
@@ -226,8 +227,10 @@ def print_report(report):
         print("  重点文件: 请根据本地扫描结果中的命中路径检查")
     print("=" * 70)
 
-    # 输出JSON供存档
-    json_path = os.path.join(BASE_DIR, "desensitization_report.json")
+    # 输出JSON供存档（默认输出到系统临时目录，避免在开源仓库内生成含敏感词的报告）
+    out_dir = os.environ.get("BID_TOOLKIT_REPORT_DIR") or tempfile.gettempdir()
+    os.makedirs(out_dir, exist_ok=True)
+    json_path = os.path.join(out_dir, f"desensitization_report_{SCAN_DATE}.json")
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
     print(f"\n完整JSON报告已保存: {json_path}")

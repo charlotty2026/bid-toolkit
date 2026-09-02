@@ -192,7 +192,7 @@ python -m bid_toolkit render 内容.json 标书.docx    # 自动发现同目录�
 编号皮肤切换（改「标题编号.格式」五项，零代码）：
 中文 `第一章 / 一、/ （一）/ 1、/ 1.1` ⇄ 十进制 `1 / 1.1 / 1.1.1`。
 
-行业模板在 `templates/`：`goods`（货物）/ `service`（服务）/ `engineering`（工程）/
+行业模板在 `templates/`：`goods`（货物）/ `service/`（服务行业内容大纲，见 `templates/service/` 子目录）/ `engineering`（工程）/
 `government`（政府）/ `enterprise`（企业）/ `bid_type_detection`（类型自动判别）。
 
 ---
@@ -275,7 +275,7 @@ BID_RAG_EMBED_BACKEND=local BID_RAG_LOCAL_EMBED_MODEL=BAAI/bge-small-zh \
 - `references/command-reference.md` — 全部命令与参数
 - `references/content-schema.md` — content.json 结构与创作规范
 - `references/workflow.md` — 完整作业流程与门卫清单
-- `templates/` — 6 套行业框架模板 + 排版配置模板
+- `templates/` — 6 类行业模板（4 套排版模板 + 1 套检测规则 + 1 套内容大纲）+ 排版配置模板
 - `company_profile/` — 企业画像模板（`***` 占位，填自己的）
 - `test_profile/` — 演示用虚构数据（张三/李四），可安全运行
 - `examples/` — 示例文件
