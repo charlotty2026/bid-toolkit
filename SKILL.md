@@ -167,7 +167,7 @@ python -m bid_toolkit orchestrate check 内容.json --docx 标书.docx
 python -m bid_toolkit desense 标书.docx --mode bid
 ```
 - 禁用词：综上所述、值得注意的是、至关重要、赋能、助力、全方位...
-- 脱敏：项目禁用词、博霖标识、占位符
+- 脱敏：项目禁用词、公司标识、占位符
 
 #### 检查3：格式+评分项覆盖
 ```bash
