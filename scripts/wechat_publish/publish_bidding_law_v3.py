@@ -30,7 +30,6 @@ def _load_env(path=None):
         path = (
             os.environ.get("BID_TOOLKIT_ENV")
             or os.path.expanduser("~/.bidtoolkit.env")
-            or "/opt/zongmen/.env"
         )
     creds = {}
     if os.path.exists(path):
