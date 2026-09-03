@@ -171,16 +171,16 @@ Word/WPS的"目录"功能，不是靠看文字大小或加粗来判断什么是�
 
 本地Agent用法示例：
 ```
-请拆解招标文件：/home/user/projects/XX项目/招标文件.pdf
+请拆解招标文件：./XX项目/招标文件.pdf
 ```
 
 带few-shot样例（给Agent看之前做过的标书，让它学风格）：
 ```
 请参考以下已完成的投标文件风格：
-- /home/user/projects/案例A/投标文件-最终版.docx
-- /home/user/projects/案例B/投标文件-最终版.docx
+- ./案例A/投标文件-最终版.docx
+- ./案例B/投标文件-最终版.docx
 
-然后拆解这份新招标文件：/home/user/projects/新项目/招标文件.pdf
+然后拆解这份新招标文件：./新项目/招标文件.pdf
 ```
 
 ---

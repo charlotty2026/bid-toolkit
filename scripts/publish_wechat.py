@@ -11,7 +11,7 @@ v2.3 (2026-08-05): Fixed full-width parens/semicolons being incorrectly
 v2.2 (2026-08-05): Fixed quote direction in normalize_quotes().
   - Body text: ASCII straight quotes " ' -> Chinese full-width curly quotes ""''
   - Code blocks/inline code/URLs: Chinese full-width quotes -> ASCII straight quotes
-  - File moved from /tmp/ to /home/ubuntu/internal/tools/
+  - File was staged in a temp dir, then moved to the user tools directory
 """
 
 import json
