@@ -1,0 +1,27 @@
+{
+  "name": "bid-review",
+  "version": "2.1.0",
+  "displayName": "标书审核母Skill",
+  "description": "投标文件质量审核与质量控制。三层递进13步审核法，脚本可用则脚本辅助，不可用则纯上下文审查，保不废标。",
+  "author": "硅基聊斋（charlotty）",
+  "tags": [
+    "tender",
+    "标书",
+    "审核",
+    "质检",
+    "脱敏",
+    "去AI味",
+    "guijiliaozhai"
+  ],
+  "license": "CC BY-NC 4.0",
+  "source": "https://github.com/charlotty2026/bid-toolkit",
+  "skills": {
+    "entry": "SKILL.md",
+    "references": [
+      "references/"
+    ],
+    "scripts": [
+      "quality_check.py"
+    ]
+  }
+}
