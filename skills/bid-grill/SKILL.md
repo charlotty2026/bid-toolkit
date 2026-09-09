@@ -2,7 +2,7 @@
 name: "bid-grill"
 description: "标书动笔前的拷问官：没问清楚不准写，把废标坑和决策盲点在写作前挖出来。任何标书 Agent 的前置关卡。"
 version: "0.4.0"
-license: "MIT"
+license: "CC BY-NC 4.0"
 ---
 
 # /bid-grill — 标书拷问官
