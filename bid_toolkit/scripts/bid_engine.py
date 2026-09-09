@@ -969,11 +969,13 @@ def check_docx(docx_path, config=None):
 
     # --- 检查1: 占位符残留 ---
     if quality_cfg.get('check_placeholder', True):
-        placeholder_patterns = ['***', '____', '【待填】', '{{.*?}}', '（待补充）']
+        placeholder_patterns = ['***', '____', '【待填】', '（待补充）']
+        placeholder_re = re.compile(r'\{\{.*?\}\}')  # {{...}} 占位符
         placeholder_count = 0
         for para in doc.paragraphs:
             for pattern in placeholder_patterns:
-                matches = re.findall(pattern, para.text)
+                # re.escape：把字面占位符当普通文本匹配，避免 *** 被当正则
+                matches = re.findall(re.escape(pattern), para.text)
                 if matches:
                     placeholder_count += len(matches)
                     results['fail'].append({
@@ -983,6 +985,14 @@ def check_docx(docx_path, config=None):
                         'severity': 'fail',
                         'fix': '替换为实际内容'
                     })
+            # 花括号占位符 {{...}}
+            m_curly = placeholder_re.findall(para.text)
+            if m_curly:
+                placeholder_count += len(m_curly)
+                results['fail'].append({
+                    'type': '占位符残留', 'detail': f'发现 {len(m_curly)} 处 {{...}} 占位符',
+                    'context': para.text[:100], 'severity': 'fail', 'fix': '替换为实际内容'
+                })
         if placeholder_count == 0:
             results['pass'].append({'type': '占位符检查', 'detail': '未发现占位符残留'})
 
@@ -1050,6 +1060,34 @@ def check_docx(docx_path, config=None):
             results['warn'].append({'type': '全角半角', 'detail': f'尚有 {len(punct_issues)-5} 处未显示'})
     else:
         results['pass'].append({'type': '全角半角', 'detail': '未发现问题'})
+
+    # --- 检查5b: 中文标点规范（引号用法 + 并列顿号） ---
+    # 铁律来源：佛跳墙·云端护法 2026-09-02 主人纠错沉淀
+    # ① 中文默认用双引号“ ”，单引号只在双引号内再引用时用
+    # ② 两个并列引号词之间必须用顿号“、”
+    def _chinese_punct_standard(full_text):
+        problems = []
+        for m in re.finditer(r'[\u2018\u0027]([\u4e00-\u9fff][^\u2018\u2019\u201c\u201d\u0027\u0022\r\n]{0,12})[\u2019\u0027]', full_text):
+            ctx = full_text[max(0, m.start()-8):m.end()+8]
+            problems.append({'type': '中文标点·单引号引中文词(应双引号)',
+                             'detail': f'“{m.group(1)}”语境应用双引号',
+                             'context': ctx, 'fix': f'改为 “{m.group(1)}”'})
+        for m in re.finditer(r'[\u201d]([\u201c])', full_text):
+            ctx = full_text[max(0, m.start()-6):m.end()+6]
+            problems.append({'type': '中文标点·并列引号缺顿号',
+                             'detail': '两个并列引号词之间应加顿号“、”',
+                             'context': ctx, 'fix': '在引号间补“、”'})
+        return problems
+
+    punct_std = _chinese_punct_standard(full_text)
+    if punct_std:
+        for p in punct_std:
+            results['fail'].append({
+                'type': p['type'], 'detail': p['detail'],
+                'context': p['context'], 'severity': 'fail', 'fix': p['fix']
+            })
+    else:
+        results['pass'].append({'type': '中文标点规范', 'detail': '引号/顿号用法正确（未用单引号引中文词、无并列引号缺顿号）'})
 
     return results
 
